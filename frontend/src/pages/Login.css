@@ -1,0 +1,208 @@
+.login-page {
+  min-height: 100vh;
+  background-image: linear-gradient(
+      rgba(255, 255, 255, 0.7),
+      rgba(255, 255, 255, 0.9)
+    ),
+    url("/assets/nakuru-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-family: Arial, sans-serif;
+}
+
+.login-overlay {
+  min-height: 100vh;
+  padding: 24px 30px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.county-logo {
+  width: 110px;
+  height: auto;
+  display: block;
+  margin: 0 auto 16px;
+}
+
+.login-header h1 {
+  font-size: 56px;
+  line-height: 1;
+  color: #071f62;
+  font-weight: 900;
+  margin: 0 0 10px;
+  letter-spacing: 1px;
+}
+
+.login-header h2 {
+  font-size: 28px;
+  line-height: 1.2;
+  color: #08703c;
+  letter-spacing: 5px;
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.login-header p {
+  font-size: 18px;
+  line-height: 1.4;
+  color: #334155;
+  margin: 0;
+}
+
+.login-content {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 35px;
+  margin-top: 20px;
+}
+.login-card {
+  width: 560px;
+  background: white;
+  padding: 35px;
+  border-radius: 22px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+}
+
+.login-card h3 {
+  font-size: 36px;
+  color: #071f62;
+  text-align: center;
+  margin: 0;
+}
+
+.subtitle {
+  text-align: center;
+  color: #64748b;
+  font-size: 20px;
+  margin-bottom: 25px;
+}
+
+.input-group {
+  height: 58px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  margin-bottom: 16px;
+  color: #64748b;
+  background: white;
+}
+
+.input-group input,
+.input-group select {
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 18px;
+  margin-left: 14px;
+  background: transparent;
+}
+
+.right-icon {
+  margin-left: auto;
+}
+
+.sign-in-btn {
+  width: 100%;
+  height: 62px;
+  border: none;
+  border-radius: 12px;
+  background: #06216f;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.divider {
+  border-top: 1px solid #e2e8f0;
+  margin: 24px 0 12px;
+}
+
+.small-text {
+  text-align: center;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.create-account-btn {
+  width: 260px;
+  height: 48px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #2563eb;
+  color: #0644ad;
+  background: white;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.forgot-btn {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: none;
+  color: #0644ad;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.info-card {
+  width: 300px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 26px;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
+}
+
+.info-card h3 {
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.info-item {
+  display: flex;
+  gap: 16px;
+  margin: 25px 0;
+  color: #0644ad;
+}
+
+.info-item h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.info-item p {
+  color: #334155;
+  font-size: 15px;
+}
+
+.green-note {
+  background: #dcfce7;
+  color: #166534;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+footer {
+  text-align: center;
+  margin-top: 25px;
+  color: #475569;
+  font-size: 14px;
+}

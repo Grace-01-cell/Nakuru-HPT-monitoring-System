@@ -1,0 +1,180 @@
+.submissions-page {
+  width: 100%;
+}
+
+.submissions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.submissions-heading h2 {
+  margin: 0;
+  font-size: 30px;
+  color: #0f172a;
+}
+
+.submissions-heading p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.submissions-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.submission-kpi {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.submission-kpi span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.submission-kpi strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 26px;
+  color: #0f172a;
+}
+
+.submissions-toolbar {
+  margin-bottom: 16px;
+}
+
+.submission-search {
+  max-width: 420px;
+  height: 46px;
+  background: white;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.submission-search input {
+  border: none;
+  outline: none;
+  width: 100%;
+  background: transparent;
+}
+
+.submissions-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  text-align: left;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+td strong {
+  display: block;
+  color: #0f172a;
+}
+
+td small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+}
+
+tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status.compliant {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.non-compliant {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.document-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  color: #0644ad;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.download-btn {
+  border: none;
+  background: #0644ad;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-footer {
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+@media (max-width: 1100px) {
+  .submissions-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .submissions-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
