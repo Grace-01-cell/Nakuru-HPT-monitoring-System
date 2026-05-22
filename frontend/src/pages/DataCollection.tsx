@@ -348,7 +348,7 @@ function DataCollection() {
           <div className="calc-box">
             <span>Amount Received</span>
             <strong>
-              {money(Number(form.amount_received || 0))}
+              {money(Number(cleanNumber(form.amount_received) || 0))}
             </strong>
           </div>
 
