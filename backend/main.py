@@ -43,12 +43,27 @@ def load_facilities() -> pd.DataFrame:
 
     rename_map = {
         "facility_na": "facility_name",
+        "facility_name": "facility_name",
         "ward_nam": "ward_name",
+        "ward_name": "ward_name",
         "county_na": "county_name",
+        "county_name": "county_name",
         "sub_count": "subcounty_name",
+        "sub_county": "subcounty_name",
+        "sub_county_name": "subcounty_name",
+        "subcounty": "subcounty_name",
+        "subcounty_name": "subcounty_name",
     }
 
     df = df.rename(columns=rename_map)
+
+    if "facility_ownership_name" in df.columns:
+        df = df[
+            df["facility_ownership_name"]
+            .astype(str)
+            .str.upper()
+            .isin(["PUBLIC", "FBO"])
+        ]
 
     needed = [
         "mfl_code",
@@ -78,12 +93,14 @@ def load_hpt_records() -> pd.DataFrame:
         "mfl_code",
         "amount_received",
         "funding_source",
+        "procurement_source",
         "date_received",
         "amount_allocated_to_hpt",
         "amount_spent_on_hpt",
         "amount_used_for_chp_kits",
         "supporting_document",
         "submitted_by",
+        "submission_date",
     ]
 
     for col in needed:
@@ -150,7 +167,7 @@ def get_joined_data() -> pd.DataFrame:
     facilities = load_facilities()
     records = load_hpt_records()
 
-    df = records.merge(facilities, on="mfl_code", how="left")
+    df = records.merge(facilities, on="mfl_code", how="inner")
     return df
 
 
@@ -181,7 +198,9 @@ def records():
 @app.get("/dashboard/county")
 def county_dashboard():
     df = get_joined_data()
+    df["date_received"] = pd.to_datetime(df["date_received"], errors="coerce")
 
+    df["reporting_month"] = df["date_received"].dt.strftime("%b-%Y")
     total_received = df["amount_received"].sum()
     total_hpt_allocated = df["amount_allocated_to_hpt"].sum()
     total_hpt_spent = df["amount_spent_on_hpt"].sum()
@@ -204,10 +223,14 @@ def county_dashboard():
 
     total_facilities = df["mfl_code"].nunique()
     compliant = df[df["compliance_status"] == "Compliant"]["mfl_code"].nunique()
-    non_compliant = df[df["compliance_status"] == "Non-Compliant"]["mfl_code"].nunique()
+    non_compliant = df[df["compliance_status"] == "Non-Compliant"][
+        "mfl_code"
+    ].nunique()
 
     chp_compliant = df[df["chp_kits_status"] == "Compliant"]["mfl_code"].nunique()
-    chp_below_target = df[df["chp_kits_status"] == "Below Target"]["mfl_code"].nunique()
+    chp_below_target = df[df["chp_kits_status"] == "Below Target"][
+        "mfl_code"
+    ].nunique()
 
     summary = {
         "total_amount_received": float(total_received),
@@ -237,6 +260,7 @@ def county_dashboard():
             hpt_allocated=("amount_allocated_to_hpt", "sum"),
             hpt_spent=("amount_spent_on_hpt", "sum"),
             amount_used_for_chp_kits=("amount_used_for_chp_kits", "sum"),
+            reporting_month=("reporting_month", "first"),
         )
         .reset_index()
     )
@@ -272,7 +296,9 @@ def county_dashboard():
         axis=1,
     )
 
-    facility_compliance["required_chp_kits_percent_of_hpt"] = REQUIRED_CHP_KIT_PERCENT_OF_HPT
+    facility_compliance["required_chp_kits_percent_of_hpt"] = (
+        REQUIRED_CHP_KIT_PERCENT_OF_HPT
+    )
 
     facility_compliance["chp_kits_status"] = facility_compliance.apply(
         lambda row: (
@@ -287,7 +313,9 @@ def county_dashboard():
 
     return {
         "summary": summary,
-        "facility_compliance": facility_compliance.fillna("").to_dict(orient="records"),
+        "facility_compliance": facility_compliance.fillna("").to_dict(
+            orient="records"
+        ),
     }
 
 
@@ -334,7 +362,9 @@ def facility_dashboard(mfl_code: str):
             else "Non-Compliant",
             "amount_used_for_chp_kits": float(total_chp_kits_used),
             "chp_kits_percent_of_hpt": float(chp_kits_percent_of_hpt),
-            "required_chp_kits_percent_of_hpt": int(REQUIRED_CHP_KIT_PERCENT_OF_HPT),
+            "required_chp_kits_percent_of_hpt": int(
+                REQUIRED_CHP_KIT_PERCENT_OF_HPT
+            ),
         },
         "records": df.astype(object).fillna("").to_dict(orient="records"),
     }
@@ -345,6 +375,7 @@ async def submit_record(
     mfl_code: str = Form(...),
     amount_received: float = Form(...),
     funding_source: str = Form(...),
+    procurement_source: str = Form(""),
     date_received: str = Form(...),
     amount_allocated_to_hpt: float = Form(...),
     amount_spent_on_hpt: float = Form(...),
@@ -371,6 +402,7 @@ async def submit_record(
         "mfl_code": mfl_code,
         "amount_received": amount_received,
         "funding_source": funding_source,
+        "procurement_source": procurement_source,
         "date_received": date_received,
         "amount_allocated_to_hpt": amount_allocated_to_hpt,
         "amount_spent_on_hpt": amount_spent_on_hpt,

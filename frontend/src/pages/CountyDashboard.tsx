@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   Wallet,
-  AlertTriangle,
   Download,
-  ShieldCheck,
   Package,
   ClipboardCheck,
   Percent,
+  ShieldCheck,
 } from "lucide-react";
 import {
   BarChart,
@@ -18,7 +17,17 @@ import {
 } from "recharts";
 import api from "../api/api";
 import "./Dashboard.css";
+import MonthSelector from "../components/MonthSelector";
+function getMonthYear(dateString: string) {
+  if (!dateString) return "";
 
+  const date = new Date(dateString);
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    year: "numeric",
+  }).replace(" ", "-");
+}
 interface Summary {
   total_amount_received: number;
   total_hpt_allocated: number;
@@ -54,6 +63,7 @@ interface FacilityCompliance {
   chp_kits_percent_of_hpt: number;
   required_chp_kits_percent_of_hpt: number;
   chp_kits_status: string;
+  reporting_month: string;
 }
 
 function money(value: number) {
@@ -90,6 +100,8 @@ function CountyDashboard() {
   const [facilities, setFacilities] = useState<FacilityCompliance[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [selectedSubcounty, setSelectedSubcounty] = useState("All");
+  const [selectedMonth, setSelectedMonth] = useState("All");
 
   const rowsPerPage = 10;
 
@@ -115,19 +127,105 @@ function CountyDashboard() {
     return <div>No dashboard data found.</div>;
   }
 
-  const submittedFacilities = summary.total_facilities_submitted || 1;
+  const subcounties = [
+    "All",
+    ...Array.from(
+      new Set(
+        facilities
+          .map((facility) => facility.subcounty_name)
+          .filter((name) => name && name.trim() !== "")
+      )
+    ),
+  ];
 
-  const lowestHptFacilities = [...facilities]
+  const filteredFacilities =facilities.filter((facility) => {
+    const matchesSubcounty =
+      selectedSubcounty === "All" || facility.subcounty_name === selectedSubcounty;
+    const matchesMonth =
+      selectedMonth === "All" || (facility as any).reporting_month === selectedMonth;
+
+    return matchesSubcounty && matchesMonth;
+  });
+  const filteredSummary = {
+    total_amount_received: filteredFacilities.reduce(
+  (sum, facility) => sum + Number(facility.amount_received || 0),
+  0
+),
+    total_hpt_allocated: filteredFacilities.reduce(
+      (sum, facility) => sum + Number(facility.hpt_allocated || 0),
+      0
+    ),
+
+    total_hpt_spent: filteredFacilities.reduce(
+      (sum, facility) => sum + Number(facility.hpt_spent || 0),
+      0
+    ),
+
+    total_chp_kits_used: filteredFacilities.reduce(
+      (sum, facility) => sum + Number(facility.amount_used_for_chp_kits || 0),
+      0
+    ),
+
+    compliant_facilities: filteredFacilities.filter(
+      (facility) => facility.compliance_status === "Compliant"
+    ).length,
+
+    non_compliant_facilities: filteredFacilities.filter(
+      (facility) => facility.compliance_status === "Non-Compliant"
+    ).length,
+
+    chp_kits_compliant_facilities: filteredFacilities.filter(
+      (facility) => facility.chp_kits_status === "Compliant"
+    ).length,
+
+    chp_kits_below_target_facilities: filteredFacilities.filter(
+      (facility) => facility.chp_kits_status === "Below Target"
+    ).length,
+  };
+
+  const filteredHptPercent =
+    filteredSummary.total_amount_received > 0
+      ? (
+          (filteredSummary.total_hpt_allocated /
+            filteredSummary.total_amount_received) *
+          100
+        ).toFixed(2)
+      : "0.00";
+
+  const filteredHptUtilization =
+    filteredSummary.total_hpt_allocated > 0
+      ? (
+          (filteredSummary.total_hpt_spent /
+            filteredSummary.total_hpt_allocated) *
+          100
+        ).toFixed(1)
+      : "0.0";
+
+  const filteredChpPercent =
+    filteredSummary.total_hpt_allocated > 0
+      ? (
+          (filteredSummary.total_chp_kits_used /
+            filteredSummary.total_hpt_allocated) *
+          100
+        ).toFixed(2)
+      : "0.00";
+
+  const submittedFacilities = filteredFacilities.length || 1;
+
+  const lowestHptFacilities = [...filteredFacilities]
     .sort((a, b) => a.hpt_percent - b.hpt_percent)
     .slice(0, 10);
 
-  const lowestChpFacilities = [...facilities]
+  const lowestChpFacilities = [...filteredFacilities]
     .sort((a, b) => a.chp_kits_percent_of_hpt - b.chp_kits_percent_of_hpt)
     .slice(0, 10);
 
-  const totalPages = Math.ceil(facilities.length / rowsPerPage);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredFacilities.length / rowsPerPage)
+  );
 
-  const paginatedFacilities = facilities.slice(
+  const paginatedFacilities = filteredFacilities.slice(
     (page - 1) * rowsPerPage,
     page * rowsPerPage
   );
@@ -147,18 +245,18 @@ function CountyDashboard() {
       "CHP Kits Status",
     ];
 
-    const rows = facilities.map((f) => [
-      f.facility_name,
-      f.subcounty_name,
-      f.ward_name,
-      f.amount_received,
-      f.hpt_allocated,
-      f.hpt_spent,
-      f.hpt_percent,
-      f.compliance_status,
-      f.amount_used_for_chp_kits,
-      f.chp_kits_percent_of_hpt,
-      f.chp_kits_status,
+    const rows = filteredFacilities.map((facility) => [
+      facility.facility_name,
+      facility.subcounty_name,
+      facility.ward_name,
+      facility.amount_received,
+      facility.hpt_allocated,
+      facility.hpt_spent,
+      facility.hpt_percent,
+      facility.compliance_status,
+      facility.amount_used_for_chp_kits,
+      facility.chp_kits_percent_of_hpt,
+      facility.chp_kits_status,
     ]);
 
     const csv = [headers, ...rows]
@@ -187,38 +285,63 @@ function CountyDashboard() {
         <p>Facility-level HPT and CHP Kits compliance visibility.</p>
       </div>
 
+      <div className="dashboard-filters">
+        <div className="filter-group">
+          <label>Subcounty</label>
+          <select
+            value={selectedSubcounty}
+            onChange={(e) => {
+              setSelectedSubcounty(e.target.value);
+              setPage(1);
+            }}
+          
+        
+          >
+            {subcounties.map((subcounty) => (
+              <option key={subcounty} value={subcounty}>
+                {subcounty}
+              </option>
+            ))}
+          </select>
+        </div>
+        <MonthSelector
+          value={selectedMonth}
+          onChange={setSelectedMonth}
+        />
+      </div>
+
       <div className="kpi-grid">
         <KpiCard
           title="Total Funds Received"
-          value={money(summary.total_amount_received)}
-          subtitle={`${summary.total_facilities_submitted} facilities submitted`}
+          value={money(filteredSummary.total_amount_received)}
+          subtitle={`${filteredFacilities.length} facilities submitted`}
           icon={Wallet}
         />
 
         <KpiCard
           title="Total HPT Allocation"
-          value={money(summary.total_hpt_allocated)}
-          subtitle={`${summary.average_hpt_percent}% of total received`}
+          value={money(filteredSummary.total_hpt_allocated)}
+          subtitle={`${filteredHptPercent}% of total received`}
           icon={Percent}
         />
 
         <KpiCard
           title="Total HPT Expenditure"
-          value={money(summary?.total_hpt_spent)}
-          subtitle={`${((summary?.total_hpt_spent / summary.total_hpt_allocated) * 100).toFixed(1)}% of HPT allocated`}
+          value={money(filteredSummary.total_hpt_spent)}
+          subtitle={`${filteredHptUtilization}% of HPT allocated`}
           icon={ShieldCheck}
         />
 
         <KpiCard
           title="CHP Kits Support"
-          value={money(summary.total_chp_kits_used)}
-          subtitle={`${summary.chp_kits_percent_of_hpt}% of HPT allocation`}
+          value={money(filteredSummary.total_chp_kits_used)}
+          subtitle={`${filteredChpPercent}% of HPT allocation`}
           icon={Package}
         />
 
         <KpiCard
           title="CHP Kits Compliance"
-          value={`${summary.chp_kits_compliant_facilities}/${summary.total_facilities_submitted}`}
+          value={`${filteredSummary.chp_kits_compliant_facilities}/${filteredFacilities.length}`}
           subtitle="Facilities meeting CHP Kits target"
           icon={ClipboardCheck}
         />
@@ -234,7 +357,7 @@ function CountyDashboard() {
                 <strong>Compliant</strong>
                 <span>Facilities meeting 40% HPT requirement</span>
               </div>
-              <b>{summary.compliant_facilities}</b>
+              <b>{filteredSummary.compliant_facilities}</b>
             </div>
 
             <div className="bar-track">
@@ -242,7 +365,9 @@ function CountyDashboard() {
                 className="bar-fill green"
                 style={{
                   width: `${
-                    (summary.compliant_facilities / submittedFacilities) * 100
+                    (filteredSummary.compliant_facilities /
+                      submittedFacilities) *
+                    100
                   }%`,
                 }}
               />
@@ -253,7 +378,7 @@ function CountyDashboard() {
                 <strong>Non-Compliant</strong>
                 <span>Facilities below 40% HPT requirement</span>
               </div>
-              <b>{summary.non_compliant_facilities}</b>
+              <b>{filteredSummary.non_compliant_facilities}</b>
             </div>
 
             <div className="bar-track">
@@ -261,7 +386,8 @@ function CountyDashboard() {
                 className="bar-fill red"
                 style={{
                   width: `${
-                    (summary.non_compliant_facilities / submittedFacilities) *
+                    (filteredSummary.non_compliant_facilities /
+                      submittedFacilities) *
                     100
                   }%`,
                 }}
@@ -308,7 +434,7 @@ function CountyDashboard() {
                 <strong>Compliant</strong>
                 <span>Facilities meeting 5% of HPT target</span>
               </div>
-              <b>{summary.chp_kits_compliant_facilities}</b>
+              <b>{filteredSummary.chp_kits_compliant_facilities}</b>
             </div>
 
             <div className="bar-track">
@@ -316,7 +442,7 @@ function CountyDashboard() {
                 className="bar-fill green"
                 style={{
                   width: `${
-                    (summary.chp_kits_compliant_facilities /
+                    (filteredSummary.chp_kits_compliant_facilities /
                       submittedFacilities) *
                     100
                   }%`,
@@ -329,7 +455,7 @@ function CountyDashboard() {
                 <strong>Below Target</strong>
                 <span>Facilities below CHP Kits requirement</span>
               </div>
-              <b>{summary.chp_kits_below_target_facilities}</b>
+              <b>{filteredSummary.chp_kits_below_target_facilities}</b>
             </div>
 
             <div className="bar-track">
@@ -337,7 +463,7 @@ function CountyDashboard() {
                 className="bar-fill red"
                 style={{
                   width: `${
-                    (summary.chp_kits_below_target_facilities /
+                    (filteredSummary.chp_kits_below_target_facilities /
                       submittedFacilities) *
                     100
                   }%`,

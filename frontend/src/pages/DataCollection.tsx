@@ -40,6 +40,7 @@ function DataCollection() {
     amount_spent_on_hpt: "",
     amount_used_for_chp_kits: "",
     submitted_by: "facility_user",
+    procurement_source: "",
   });
 
   const [document, setDocument] = useState<File | null>(null);
@@ -104,7 +105,7 @@ function DataCollection() {
       if (document) {
         data.append("supporting_document", document);
       }
-
+      
       await api.post("/submit-record", data);
 
       alert("Record submitted successfully");
@@ -118,6 +119,7 @@ function DataCollection() {
         amount_spent_on_hpt: "",
         amount_used_for_chp_kits: "",
         submitted_by: "facility_user",
+        procurement_source: "",
       });
 
       setDocument(null);
@@ -208,7 +210,22 @@ function DataCollection() {
                 <option>Partner Funding</option>
               </select>
             </div>
-
+            <div className="form-group">
+              <label>Procurement Source</label>
+              
+              <select
+                value={form.procurement_source}
+                onChange={(e) =>
+                  updateField("procurement_source", e.target.value)
+                }
+                required
+              >
+                <option value="">Select procurement source</option>
+                <option value="KEMSA">KEMSA</option>
+                <option value="MEDS">MEDS</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
             <div className="form-group">
               <label>Date Received</label>
 
@@ -285,7 +302,7 @@ function DataCollection() {
               />
             </div>
           </div>
-
+            
           <div className="summary-grid">
             <div className="summary-box">
               <span>Balance</span>

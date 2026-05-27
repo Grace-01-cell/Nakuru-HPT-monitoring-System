@@ -1,0 +1,50 @@
+.month-filter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.month-select-wrap {
+  position: relative;
+  height: 44px;
+  min-width: 230px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.custom-month select {
+  width: 100%;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 28px 0 0 !important;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.month-select-wrap::after {
+  content: "";
+}
+.custom-month select {
+  width: 100%;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+
+  padding: 0 !important;
+
+  text-align: center;
+  text-align-last: center;
+
+  appearance: auto;
+  -webkit-appearance: auto;
+  -moz-appearance: auto;
+}

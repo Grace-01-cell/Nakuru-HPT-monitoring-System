@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, Search } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import "./Layout.css";
 
 function Topbar() {
@@ -15,10 +15,7 @@ function Topbar() {
           <input placeholder="Search facility..." />
         </div>
 
-        <button className="date-btn">
-          <CalendarDays size={18} />
-          May 2026
-        </button>
+
 
         <button className="icon-btn">
           <Bell size={18} />

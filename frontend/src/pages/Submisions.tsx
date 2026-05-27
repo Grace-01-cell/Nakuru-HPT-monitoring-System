@@ -1,26 +1,56 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, Search } from "lucide-react";
+import { Search, FileText } from "lucide-react";
 import api from "../api/api";
 import "./Submissions.css";
+import MonthSelector from "../components/MonthSelector";
 
-interface SubmissionRecord {
+function getMonthYear(dateString: string) {
+  if (!dateString) return "";
+
+  const value = String(dateString).trim();
+
+  let date: Date;
+
+  if (value.includes("/")) {
+    const [day, month, year] = value.split("/");
+    date = new Date(Number(year), Number(month) - 1, Number(day));
+  } else {
+    date = new Date(value);
+  }
+
+  if (isNaN(date.getTime())) return "";
+
+  return date
+    .toLocaleString("en-US", {
+      month: "short",
+      year: "numeric",
+    })
+    .replace(" ", "-");
+}
+interface Submission {
   mfl_code: string;
   facility_name: string;
   subcounty_name: string;
   ward_name: string;
-  amount_received: number;
+  reporting_month: string;
+
   funding_source: string;
-  date_received: string;
+  procurement_source: string;
+
+  amount_received: number;
   amount_allocated_to_hpt: number;
   amount_spent_on_hpt: number;
-  amount_used_for_chp_kits: number;
+
   hpt_percent: number;
   compliance_status: string;
+
+  amount_used_for_chp_kits: number;
   chp_kits_percent_of_hpt: number;
   chp_kits_status: string;
-  supporting_document: string;
+
+  date_received: string;
   submitted_by: string;
-  submission_date?: string;
+  supporting_document: string;
 }
 
 function money(value: number) {
@@ -28,137 +58,168 @@ function money(value: number) {
 }
 
 function Submissions() {
-  const [records, setRecords] = useState<SubmissionRecord[]>([]);
-  const [search, setSearch] = useState("");
+  const [records, setRecords] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  const [search, setSearch] = useState("");
+  const [selectedSubcounty, setSelectedSubcounty] = useState("All");
+  const [selectedMonth, setSelectedMonth] = useState("All");
   useEffect(() => {
-    api.get("/records").then((res) => {
-      setRecords(res.data);
-    });
+    api
+      .get("/records")
+      .then((res) => {
+        setRecords(res.data);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to load submissions");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((record) =>
-      `${record.facility_name} ${record.subcounty_name} ${record.submitted_by}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
-  }, [records, search]);
-
-  function downloadCSV() {
-    const headers = [
-      "Facility",
-      "Subcounty",
-      "Ward",
-      "Funding Source",
-      "Date Received",
-      "Amount Received",
-      "HPT %",
-      "HPT Status",
-      "CHP Kits %",
-      "CHP Status",
-      "Submitted By",
-      "Document",
+  const subcounties = useMemo(() => {
+    return [
+      "All",
+      ...Array.from(
+        new Set(
+          records
+            .map((record) => record.subcounty_name)
+            .filter((name) => name && name.trim() !== "")
+        )
+      ),
     ];
+  }, [records]);
 
-    const rows = filteredRecords.map((r) => [
-      r.facility_name,
-      r.subcounty_name,
-      r.ward_name,
-      r.funding_source,
-      r.date_received,
-      r.amount_received,
-      r.hpt_percent,
-      r.compliance_status,
-      r.chp_kits_percent_of_hpt,
-      r.chp_kits_status,
-      r.submitted_by,
-      r.supporting_document,
-    ]);
+  const filteredRecords = useMemo(() => {
+    return records.filter((record) => {
+      const matchesSearch =
+        record.facility_name
+          ?.toLowerCase()
+          .includes(search.toLowerCase()) ||
+        record.subcounty_name
+          ?.toLowerCase()
+          .includes(search.toLowerCase()) ||
+        record.submitted_by
+          ?.toLowerCase()
+          .includes(search.toLowerCase());
 
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n");
+      const matchesSubcounty =
+        selectedSubcounty === "All"
+          ? true
+          : record.subcounty_name === selectedSubcounty;
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
+      const matchesMonth =
+        selectedMonth === "All"
+          ? true
+          : getMonthYear(record.date_received) === selectedMonth;
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "submissions.csv";
-    link.click();
+      return matchesSearch && matchesSubcounty && matchesMonth;
+    });
+  }, [records, search, selectedSubcounty, selectedMonth]);
 
-    window.URL.revokeObjectURL(url);
-  }
+  const totalSubmissions = filteredRecords.length;
 
-  const compliant = records.filter(
+  const compliantFacilities = filteredRecords.filter(
     (r) => r.compliance_status === "Compliant"
   ).length;
 
-  const nonCompliant = records.filter(
+  const nonCompliantFacilities = filteredRecords.filter(
     (r) => r.compliance_status === "Non-Compliant"
   ).length;
 
-  const withDocuments = records.filter((r) => r.supporting_document).length;
+  const totalDocuments = filteredRecords.filter(
+    (r) => r.supporting_document
+  ).length;
+
+  if (loading) {
+    return <div className="dashboard-loading">Loading submissions...</div>;
+  }
 
   return (
-    <div className="submissions-page">
-      <div className="submissions-heading">
-        <div>
-          <h2>Submissions</h2>
-          <p>Operational view of facility-submitted HPT records.</p>
-        </div>
-
-        <button className="download-btn" onClick={downloadCSV}>
-          <Download size={16} />
-          Export Submissions
-        </button>
+    <div className="dashboard-page">
+      <div className="dashboard-heading">
+        <h2>Submissions</h2>
+        <p>Track submitted HPT and CHP Kits compliance records.</p>
       </div>
 
-      <div className="submissions-kpis">
-        <div className="submission-kpi">
-          <span>Total Submissions</span>
-          <strong>{records.length}</strong>
+      <div className="dashboard-filters">
+        <div className="filter-group">
+          <label>Subcounty</label>
+
+          <select
+            value={selectedSubcounty}
+            onChange={(e) => setSelectedSubcounty(e.target.value)}
+          >
+            {subcounties.map((subcounty) => (
+              <option key={subcounty} value={subcounty}>
+                {subcounty}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="submission-kpi">
-          <span>HPT Compliant</span>
-          <strong>{compliant}</strong>
-        </div>
-
-        <div className="submission-kpi">
-          <span>HPT Non-Compliant</span>
-          <strong>{nonCompliant}</strong>
-        </div>
-
-        <div className="submission-kpi">
-          <span>With Documents</span>
-          <strong>{withDocuments}</strong>
+        <div className="filter-group">
+          
+          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
         </div>
       </div>
 
-      <div className="submissions-toolbar">
-        <div className="submission-search">
-          <Search size={18} />
-          <input
-            placeholder="Search by facility, subcounty, or submitted by..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div>
+            <p>Total Submissions</p>
+            <h3>{totalSubmissions}</h3>
+            <span>Filtered records</span>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div>
+            <p>HPT Compliant</p>
+            <h3>{compliantFacilities}</h3>
+            <span>Facilities meeting 40%</span>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div>
+            <p>HPT Non-Compliant</p>
+            <h3>{nonCompliantFacilities}</h3>
+            <span>Facilities below 40%</span>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div>
+            <p>With Documents</p>
+            <h3>{totalDocuments}</h3>
+            <span>Uploaded supporting files</span>
+          </div>
         </div>
       </div>
 
-      <div className="submissions-card">
+      <div className="table-card">
+        <div className="table-toolbar">
+          <div className="search-box">
+            <Search size={16} />
+
+            <input
+              type="text"
+              placeholder="Search by facility, subcounty, or submitted by..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Facility</th>
+                <th>Subcounty</th>
                 <th>Funding Source</th>
+                <th>Procurement Source</th>
                 <th>Date Received</th>
                 <th>Amount Received</th>
                 <th>HPT %</th>
@@ -172,17 +233,27 @@ function Submissions() {
 
             <tbody>
               {filteredRecords.map((record, index) => (
-                <tr key={`${record.mfl_code}-${index}`}>
+                <tr key={index}>
                   <td>
-                    <strong>{record.facility_name}</strong>
-                    <small>
-                      {record.subcounty_name || "—"} • {record.ward_name || "—"}
-                    </small>
+                    <div className="facility-cell">
+                      <strong>{record.facility_name}</strong>
+
+                      <span>
+                        {record.subcounty_name} • {record.ward_name}
+                      </span>
+                    </div>
                   </td>
 
-                  <td>{record.funding_source || "—"}</td>
-                  <td>{record.date_received || "—"}</td>
+                  <td>{record.subcounty_name || "—"}</td>
+
+                  <td>{record.funding_source}</td>
+
+                  <td>{record.procurement_source || "—"}</td>
+
+                  <td>{record.date_received}</td>
+
                   <td>{money(record.amount_received)}</td>
+
                   <td>{record.hpt_percent}%</td>
 
                   <td>
@@ -211,14 +282,14 @@ function Submissions() {
                     </span>
                   </td>
 
-                  <td>{record.submitted_by || "—"}</td>
+                  <td>{record.submitted_by}</td>
 
                   <td>
                     {record.supporting_document ? (
-                      <span className="document-pill">
+                      <button className="view-doc-btn">
                         <FileText size={14} />
                         View
-                      </span>
+                      </button>
                     ) : (
                       "—"
                     )}
@@ -228,10 +299,6 @@ function Submissions() {
             </tbody>
           </table>
         </div>
-
-        <p className="table-footer">
-          Showing {filteredRecords.length} of {records.length} submissions
-        </p>
       </div>
     </div>
   );

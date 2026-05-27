@@ -20,7 +20,11 @@ df.columns = (
     .str.replace(" ", "_")
     .str.replace("-", "_")
 )
-
+df = df[
+    df["facility_ownership_name"]    .astype(str)
+    .str.upper()
+    .isin(["PUBLIC", "FBO"])
+]
 sample_facilities = df.head(30)
 
 records = []
