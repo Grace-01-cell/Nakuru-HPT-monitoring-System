@@ -16,7 +16,7 @@ const menuItems = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Submissions", path: "/submissions", icon: FileText },
   { label: "Facilities", path: "/facilities", icon: Building2 },
-  { label: "Users", path: "/users", icon: Users },
+  
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 

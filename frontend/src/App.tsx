@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import DataCollection from "./pages/DataCollection";
 import MainLayout from "./components/layout/MainLayout";
 import Submissions from "./pages/Submisions";
+import FacilityTrends from "./pages/FacilityTrends";
 
 import CountyDashboard from "./pages/CountyDashboard";
 <Route path="/dashboard" element={<CountyDashboard />} />
@@ -29,9 +30,10 @@ function App() {
             element={<DataCollection />}
           />
           <Route path="/submissions" element={<Submissions />} />
-          <Route path="/facilities" element={<Placeholder title="Facilities" />} />
+          
           <Route path="/users" element={<Placeholder title="Users" />} />
           <Route path="/settings" element={<Placeholder title="Settings" />} />
+          <Route path="/facilities" element={<FacilityTrends />} />
         </Route>
       </Routes>
     </BrowserRouter>
