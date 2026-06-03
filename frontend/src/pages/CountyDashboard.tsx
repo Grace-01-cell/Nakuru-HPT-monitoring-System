@@ -63,7 +63,7 @@ interface FacilityCompliance {
   chp_kits_percent_of_hpt: number;
   required_chp_kits_percent_of_hpt: number;
   chp_kits_status: string;
-  reporting_month: string;
+  reporting_period: string;
 }
 
 function money(value: number) {
@@ -106,18 +106,20 @@ function CountyDashboard() {
   const rowsPerPage = 10;
 
   useEffect(() => {
-    api
-      .get("/dashboard/county")
-      .then((res) => {
-        setSummary(res.data.summary);
-        setFacilities(res.data.facility_compliance);
-      })
-      .catch((err) => {
-        console.error(err);
-        alert("Failed to load dashboard data");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  setLoading(true);
+
+  api
+    .get(`/dashboard/county?reporting_periods=${selectedMonth}`)
+    .then((res) => {
+      setSummary(res.data.summary);
+      setFacilities(res.data.facility_compliance);
+    })
+    .catch((err) => {
+      console.error(err);
+      alert("Failed to load dashboard data");
+    })
+    .finally(() => setLoading(false));
+}, [selectedMonth]);
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -138,13 +140,10 @@ function CountyDashboard() {
     ),
   ];
 
-  const filteredFacilities =facilities.filter((facility) => {
-    const matchesSubcounty =
-      selectedSubcounty === "All" || facility.subcounty_name === selectedSubcounty;
-    const matchesMonth =
-      selectedMonth === "All" || (facility as any).reporting_month === selectedMonth;
-
-    return matchesSubcounty && matchesMonth;
+  const filteredFacilities = facilities.filter((facility) => {
+    return (
+      selectedSubcounty === "All" || facility.subcounty_name === selectedSubcounty
+    );
   });
   const filteredSummary = {
     total_amount_received: filteredFacilities.reduce(

@@ -101,6 +101,7 @@ def load_hpt_records() -> pd.DataFrame:
         "supporting_document",
         "submitted_by",
         "submission_date",
+        "reporting_period",
     ]
 
     for col in needed:
@@ -196,11 +197,14 @@ def records():
 
 
 @app.get("/dashboard/county")
-def county_dashboard():
+def county_dashboard(reporting_periods: str = "All"):
     df = get_joined_data()
-    df["date_received"] = pd.to_datetime(df["date_received"], errors="coerce")
 
-    df["reporting_month"] = df["date_received"].dt.strftime("%b-%Y")
+    if reporting_periods != "All":
+        selected_periods = reporting_periods.split(",")
+        df = df[df["reporting_period"].isin(selected_periods)]
+
+    df["reporting_month"] = df["reporting_period"]
     total_received = df["amount_received"].sum()
     total_hpt_allocated = df["amount_allocated_to_hpt"].sum()
     total_hpt_spent = df["amount_spent_on_hpt"].sum()
@@ -260,7 +264,7 @@ def county_dashboard():
             hpt_allocated=("amount_allocated_to_hpt", "sum"),
             hpt_spent=("amount_spent_on_hpt", "sum"),
             amount_used_for_chp_kits=("amount_used_for_chp_kits", "sum"),
-            reporting_month=("reporting_month", "first"),
+            reporting_period=("reporting_period", "first"),
         )
         .reset_index()
     )
@@ -375,6 +379,7 @@ async def submit_record(
     mfl_code: str = Form(...),
     amount_received: float = Form(...),
     funding_source: str = Form(...),
+    reporting_period: str = Form(""),
     procurement_source: str = Form(""),
     date_received: str = Form(...),
     amount_allocated_to_hpt: float = Form(...),
@@ -402,6 +407,7 @@ async def submit_record(
         "mfl_code": mfl_code,
         "amount_received": amount_received,
         "funding_source": funding_source,
+         "reporting_period": reporting_period,
         "procurement_source": procurement_source,
         "date_received": date_received,
         "amount_allocated_to_hpt": amount_allocated_to_hpt,
@@ -410,6 +416,7 @@ async def submit_record(
         "supporting_document": document_name,
         "submitted_by": submitted_by,
         "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+       
     }
 
     updated_df = pd.concat([old_df, pd.DataFrame([new_record])], ignore_index=True)

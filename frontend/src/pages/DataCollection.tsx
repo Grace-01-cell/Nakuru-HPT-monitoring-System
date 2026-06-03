@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import api from "../api/api";
+import MonthSelector from "../components/MonthSelector";
 import "./DataCollection.css";
 function formatNumber(value: string) {
   const raw = value.replace(/,/g, "").replace(/[^\d]/g, "");
@@ -35,6 +36,7 @@ function DataCollection() {
     mfl_code: "",
     amount_received: "",
     funding_source: "",
+    reporting_period: "All",
     date_received: "",
     amount_allocated_to_hpt: "",
     amount_spent_on_hpt: "",
@@ -98,9 +100,29 @@ function DataCollection() {
 
       const data = new FormData();
 
-      Object.entries(form).forEach(([key, value]) => {
-        data.append(key, value);
-      });
+      
+        data.append("mfl_code", form.mfl_code);
+        data.append("amount_received", cleanNumber(form.amount_received));
+        data.append("funding_source", form.funding_source);
+        data.append("reporting_period", form.reporting_period);
+        data.append("procurement_source", form.procurement_source);
+        data.append("date_received", form.date_received);
+        data.append(
+          "amount_allocated_to_hpt",
+  cleanNumber(form.amount_allocated_to_hpt)
+);
+
+data.append(
+  "amount_spent_on_hpt",
+  cleanNumber(form.amount_spent_on_hpt)
+) ;   
+
+data.append(
+  "amount_used_for_chp_kits",
+  cleanNumber(form.amount_used_for_chp_kits)
+);
+data.append("submitted_by", form.submitted_by);
+      
 
       if (document) {
         data.append("supporting_document", document);
@@ -114,6 +136,7 @@ function DataCollection() {
         mfl_code: "",
         amount_received: "",
         funding_source: "",
+        reporting_period: "All",
         date_received: "",
         amount_allocated_to_hpt: "",
         amount_spent_on_hpt: "",
@@ -207,8 +230,20 @@ function DataCollection() {
                 <option>County Allocation</option>
                 <option>FIF</option>
                 <option>SHA</option>
+                <option>SHIF</option>
+                <option>Facility Collection (Out of Pocket)</option>
+
                 <option>Partner Funding</option>
               </select>
+            </div>
+            <div className="form-group">
+             <label>Reporting Period</label>
+              <MonthSelector
+                value={form.reporting_period}
+                onChange={(value) =>
+                  updateField("reporting_period", value)
+                }
+              /> 
             </div>
             <div className="form-group">
               <label>Procurement Source</label>
@@ -303,29 +338,7 @@ function DataCollection() {
             </div>
           </div>
             
-          <div className="summary-grid">
-            <div className="summary-box">
-              <span>Balance</span>
-              <strong>{money(calculations.balance)}</strong>
-            </div>
-
-            <div className="summary-box">
-              <span>HPT %</span>
-              <strong>{calculations.hptPercent}%</strong>
-            </div>
-
-            <div className="summary-box">
-              <span>Required CHP Kits Amount</span>
-              <strong>
-                {money(calculations.requiredChpAmount)}
-              </strong>
-            </div>
-
-            <div className="summary-box">
-              <span>CHP Kits % of HPT</span>
-              <strong>{calculations.chpPercent}%</strong>
-            </div>
-          </div>
+         
 
           <div className="section-title">
             <FileText size={18} />
@@ -359,62 +372,7 @@ function DataCollection() {
           </button>
         </form>
 
-        <div className="calculation-card">
-          <h3>Live Calculation</h3>
-
-          <div className="calc-box">
-            <span>Amount Received</span>
-            <strong>
-              {money(Number(cleanNumber(form.amount_received) || 0))}
-            </strong>
-          </div>
-
-          <div className="calc-box">
-            <span>HPT Allocation %</span>
-            <strong>{calculations.hptPercent}%</strong>
-          </div>
-
-          <div
-            className={
-              Number(calculations.hptPercent) >= 40
-                ? "status-box compliant"
-                : "status-box non-compliant"
-            }
-          >
-            {Number(calculations.hptPercent) >= 40
-              ? "Compliant with Required HPT %"
-              : "Below Required HPT %"}
-          </div>
-
-          <div className="calc-box">
-            <span>Required CHP Kits Amount</span>
-            <strong>
-              {money(calculations.requiredChpAmount)}
-            </strong>
-          </div>
-
-          <div className="calc-box">
-            <span>CHP Kits % of HPT</span>
-            <strong>{calculations.chpPercent}%</strong>
-          </div>
-
-          <div
-            className={
-              Number(calculations.chpPercent) >= 5
-                ? "status-box compliant"
-                : "status-box non-compliant"
-            }
-          >
-            {Number(calculations.chpPercent) >= 5
-              ? "CHP Kits Requirement Met"
-              : "Below CHP Kits Target"}
-          </div>
-
-          <p className="note-text">
-            Required HPT percentage is currently set to 40%.
-            5% of the HPT allocation should go to CHP Kits.
-          </p>
-        </div>
+       
       </div>
     </div>
   );

@@ -19,11 +19,14 @@
 }
 
 .collection-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  display: flex;
+  justify-content: center;
   width: 100%;
-  align-items: start;
+}
+
+.collection-card {
+  width: 100%;
+  max-width: 980px;
 }
 
 .collection-card,
