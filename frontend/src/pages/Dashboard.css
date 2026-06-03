@@ -249,3 +249,37 @@ td {
   background: white;
   outline: none;
 }
+.trend-section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.trend-section .chart-card {
+  width: 100%;
+}
+.dashboard-analysis-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+
+.compliance-stack,
+.trend-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.trend-stack .chart-card {
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+}

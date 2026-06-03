@@ -160,8 +160,11 @@ def load_hpt_records() -> pd.DataFrame:
         ),
         axis=1,
     )
-
+    df["reporting_period_sort"] = pd.to_datetime(
+        df["reporting_period"], errors="coerce"
+    )
     return df
+
 
 
 def get_joined_data() -> pd.DataFrame:
@@ -197,12 +200,16 @@ def records():
 
 
 @app.get("/dashboard/county")
-def county_dashboard(reporting_periods: str = "All"):
+def county_dashboard(reporting_periods: str = "All",subcounty: str = "All"):
     df = get_joined_data()
 
     if reporting_periods != "All":
         selected_periods = reporting_periods.split(",")
         df = df[df["reporting_period"].isin(selected_periods)]
+
+    if subcounty != "All":
+        selected_subcounties = subcounty.split(",")
+        df = df[df["subcounty_name"].isin(selected_subcounties)]
 
     df["reporting_month"] = df["reporting_period"]
     total_received = df["amount_received"].sum()
@@ -312,15 +319,41 @@ def county_dashboard(reporting_periods: str = "All"):
         ),
         axis=1,
     )
-
+    
     facility_compliance = facility_compliance.astype(object)
+    funding_source_trend = (
+    df.groupby(
+        ["reporting_period_sort", "reporting_period", "funding_source"],
+        dropna=False,
+    )
+    .agg(amount_received=("amount_received", "sum"))
+    .reset_index()
+    .sort_values("reporting_period_sort")
+)
 
+    hpt_allocation_trend = (
+    df.groupby(
+        ["reporting_period_sort", "reporting_period"],
+        dropna=False,
+    )
+    .agg(
+        amount_received=("amount_received", "sum"),
+        hpt_allocated=("amount_allocated_to_hpt", "sum"),
+        hpt_spent=("amount_spent_on_hpt", "sum"),
+        chp_kits_used=("amount_used_for_chp_kits", "sum"),
+    )
+    .reset_index()
+    .sort_values("reporting_period_sort")
+)
     return {
         "summary": summary,
         "facility_compliance": facility_compliance.fillna("").to_dict(
             orient="records"
         ),
+        "funding_source_trend": funding_source_trend.fillna("").to_dict(orient="records"),
+        "hpt_allocation_trend": hpt_allocation_trend.fillna("").to_dict(orient="records"),
     }
+    
 
 
 @app.get("/dashboard/facility/{mfl_code}")

@@ -14,6 +14,10 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  Legend,
 } from "recharts";
 import api from "../api/api";
 import "./Dashboard.css";
@@ -102,6 +106,23 @@ function CountyDashboard() {
   const [page, setPage] = useState(1);
   const [selectedSubcounty, setSelectedSubcounty] = useState("All");
   const [selectedMonth, setSelectedMonth] = useState("All");
+  const [fundingSourceTrend, setFundingSourceTrend] = useState([]);
+  const [hptAllocationTrend, setHptAllocationTrend] = useState([]);
+  const fundingSourceChartData = Object.values(
+  fundingSourceTrend.reduce((acc: any, item: any) => {
+    const period = item.reporting_period;
+
+    if (!acc[period]) {
+      acc[period] = { reporting_period: period };
+    }
+
+    acc[period][item.funding_source] = item.amount_received;
+
+    return acc;
+  }, {})
+);
+
+const hptAllocationChartData = hptAllocationTrend;
 
   const rowsPerPage = 10;
 
@@ -113,6 +134,8 @@ function CountyDashboard() {
     .then((res) => {
       setSummary(res.data.summary);
       setFacilities(res.data.facility_compliance);
+      setFundingSourceTrend(res.data.funding_source_trend || []);
+      setHptAllocationTrend(res.data.hpt_allocation_trend || []);
     })
     .catch((err) => {
       console.error(err);
@@ -346,159 +369,186 @@ function CountyDashboard() {
         />
       </div>
 
-      <div className="dashboard-grid">
-        <div className="chart-card">
-          <h3>HPT Compliance Status</h3>
+      <div className="dashboard-analysis-grid">
+  <div className="compliance-stack">
+    <div className="chart-card">
+      <h3>HPT Compliance Status</h3>
 
-          <div className="compliance-bars">
-            <div className="compliance-row">
-              <div>
-                <strong>Compliant</strong>
-                <span>Facilities meeting 40% HPT requirement</span>
-              </div>
-              <b>{filteredSummary.compliant_facilities}</b>
-            </div>
-
-            <div className="bar-track">
-              <div
-                className="bar-fill green"
-                style={{
-                  width: `${
-                    (filteredSummary.compliant_facilities /
-                      submittedFacilities) *
-                    100
-                  }%`,
-                }}
-              />
-            </div>
-
-            <div className="compliance-row">
-              <div>
-                <strong>Non-Compliant</strong>
-                <span>Facilities below 40% HPT requirement</span>
-              </div>
-              <b>{filteredSummary.non_compliant_facilities}</b>
-            </div>
-
-            <div className="bar-track">
-              <div
-                className="bar-fill red"
-                style={{
-                  width: `${
-                    (filteredSummary.non_compliant_facilities /
-                      submittedFacilities) *
-                    100
-                  }%`,
-                }}
-              />
-            </div>
+      <div className="compliance-bars">
+        <div className="compliance-row">
+          <div>
+            <strong>Compliant</strong>
+            <span>Facilities meeting 40% HPT requirement</span>
           </div>
+          <b>{filteredSummary.compliant_facilities}</b>
         </div>
 
-        <div className="chart-card wide">
-          <h3>Bottom 10 Facilities by HPT %</h3>
+        <div className="bar-track">
+          <div
+            className="bar-fill green"
+            style={{
+              width: `${
+                (filteredSummary.compliant_facilities / submittedFacilities) *
+                100
+              }%`,
+            }}
+          />
+        </div>
 
-          <ResponsiveContainer width="100%" height={420}>
-            <BarChart
-              data={lowestHptFacilities}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 180, bottom: 10 }}
-            >
-              <XAxis type="number" domain={[0, 100]} />
-              <YAxis
-                type="category"
-                dataKey="facility_name"
-                width={170}
-                tick={{ fontSize: 11 }}
-              />
-              <Tooltip />
-              <Bar
-                dataKey="hpt_percent"
-                name="HPT %"
-                fill="#2563eb"
-                radius={[0, 8, 8, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="compliance-row">
+          <div>
+            <strong>Non-Compliant</strong>
+            <span>Facilities below 40% HPT requirement</span>
+          </div>
+          <b>{filteredSummary.non_compliant_facilities}</b>
+        </div>
+
+        <div className="bar-track">
+          <div
+            className="bar-fill red"
+            style={{
+              width: `${
+                (filteredSummary.non_compliant_facilities /
+                  submittedFacilities) *
+                100
+              }%`,
+            }}
+          />
         </div>
       </div>
+    </div>
 
-      <div className="dashboard-grid">
-        <div className="chart-card">
-          <h3>CHP Kits Compliance Status</h3>
+    <div className="chart-card">
+      <h3>CHP Kits Compliance Status</h3>
 
-          <div className="compliance-bars">
-            <div className="compliance-row">
-              <div>
-                <strong>Compliant</strong>
-                <span>Facilities meeting 5% of HPT target</span>
-              </div>
-              <b>{filteredSummary.chp_kits_compliant_facilities}</b>
-            </div>
-
-            <div className="bar-track">
-              <div
-                className="bar-fill green"
-                style={{
-                  width: `${
-                    (filteredSummary.chp_kits_compliant_facilities /
-                      submittedFacilities) *
-                    100
-                  }%`,
-                }}
-              />
-            </div>
-
-            <div className="compliance-row">
-              <div>
-                <strong>Below Target</strong>
-                <span>Facilities below CHP Kits requirement</span>
-              </div>
-              <b>{filteredSummary.chp_kits_below_target_facilities}</b>
-            </div>
-
-            <div className="bar-track">
-              <div
-                className="bar-fill red"
-                style={{
-                  width: `${
-                    (filteredSummary.chp_kits_below_target_facilities /
-                      submittedFacilities) *
-                    100
-                  }%`,
-                }}
-              />
-            </div>
+      <div className="compliance-bars">
+        <div className="compliance-row">
+          <div>
+            <strong>Compliant</strong>
+            <span>Facilities meeting 5% of HPT target</span>
           </div>
+          <b>{filteredSummary.chp_kits_compliant_facilities}</b>
         </div>
 
-        <div className="chart-card wide">
-          <h3>Bottom 10 Facilities by CHP Kits %</h3>
+        <div className="bar-track">
+          <div
+            className="bar-fill green"
+            style={{
+              width: `${
+                (filteredSummary.chp_kits_compliant_facilities /
+                  submittedFacilities) *
+                100
+              }%`,
+            }}
+          />
+        </div>
 
-          <ResponsiveContainer width="100%" height={420}>
-            <BarChart
-              data={lowestChpFacilities}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 180, bottom: 10 }}
-            >
-              <XAxis type="number" domain={[0, 20]} />
-              <YAxis
-                type="category"
-                dataKey="facility_name"
-                width={170}
-                tick={{ fontSize: 11 }}
-              />
-              <Tooltip />
-              <Bar
-                dataKey="chp_kits_percent_of_hpt"
-                name="CHP Kits % of HPT"
-                fill="#0f766e"
-                radius={[0, 8, 8, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="compliance-row">
+          <div>
+            <strong>Below Target</strong>
+            <span>Facilities below CHP Kits requirement</span>
+          </div>
+          <b>{filteredSummary.chp_kits_below_target_facilities}</b>
+        </div>
+
+        <div className="bar-track">
+          <div
+            className="bar-fill red"
+            style={{
+              width: `${
+                (filteredSummary.chp_kits_below_target_facilities /
+                  submittedFacilities) *
+                100
+              }%`,
+            }}
+          />
         </div>
       </div>
+    </div>
+  </div>
+
+  <div className="trend-stack">
+    <div className="chart-card wide">
+      <h3>Funding Source Trend</h3>
+
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={fundingSourceChartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="reporting_period" />
+
+          <YAxis
+            tickFormatter={(value) =>
+              `${(Number(value) / 1000000).toFixed(1)}M`
+            }
+          />
+
+          <Tooltip
+            formatter={(value: number) =>
+              `KES ${Number(value).toLocaleString()}`
+            }
+          />
+
+          <Legend />
+
+          <Line type="monotone" dataKey="FIF" stroke="#2563eb" />
+          <Line type="monotone" dataKey="SHIF" stroke="#16a34a" />
+          <Line
+            type="monotone"
+            dataKey="Facility Collection (Out of Pocket)"
+            stroke="#f97316"
+          />
+          <Line type="monotone" dataKey="Partner Funding" stroke="#7c3aed" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+
+    <div className="chart-card wide">
+      <h3>Total Allocation Trend</h3>
+
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={hptAllocationChartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="reporting_period" />
+
+          <YAxis
+            tickFormatter={(value) =>
+              `${(Number(value) / 1000000).toFixed(1)}M`
+            }
+          />
+
+          <Tooltip
+            formatter={(value: number) =>
+              `KES ${Number(value).toLocaleString()}`
+            }
+          />
+
+          <Legend />
+
+          <Line
+            type="monotone"
+            dataKey="amount_received"
+            name="Total Funds Received"
+            stroke="#2563eb"
+          />
+
+          <Line
+            type="monotone"
+            dataKey="hpt_spent"
+            name="HPT Expenditure"
+            stroke="#f97316"
+          />
+
+          <Line
+            type="monotone"
+            dataKey="chp_kits_used"
+            name="CHP Kits Support"
+            stroke="#7c3aed"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+</div>
 
       <div className="chart-card wide">
         <div className="table-title-row">
