@@ -17,21 +17,19 @@ function FacilityTrends() {
           <LineChart size={42} />
         </div>
 
-        <h1>Facility Trends</h1>
+        <h1>Facility Performance Trend</h1>
 
         <p className="coming-soon">
-          Advanced facility-level analytics will become available as additional
-          monthly reporting data is collected.
+          Coming soon: This page will provide facility-specific performance trends and
+  comparisons once multiple reporting periods have been validated.
         </p>
 
         <div className="future-features">
           <div className="feature-item">Facility-level compliance trends over time</div>
-          <div className="feature-item">HPT allocation and expenditure history</div>
-          <div className="feature-item">CHP Kits utilization tracking</div>
+          <div className="feature-item">Monthly HPT compliance progression</div>
+          <div className="feature-item">Monthly CHP Kits utilization progression</div>
           
-          <div className="feature-item">Submission history and reporting timelines</div>
-          <div className="feature-item">Procurement source trends (KEMSA/MEDS/Other)</div>
-          <div className="feature-item">Supporting document history</div>
+
         </div>
       </div>
     </div>

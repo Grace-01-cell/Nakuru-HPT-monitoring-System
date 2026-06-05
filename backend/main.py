@@ -200,15 +200,15 @@ def records():
 
 
 @app.get("/dashboard/county")
-def county_dashboard(reporting_periods: str = "All",subcounty: str = "All", funding_sources: str = "All",):
+def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", funding_sources: str = "All",):
     df = get_joined_data()
 
     if reporting_periods != "All":
         selected_periods = reporting_periods.split(",")
         df = df[df["reporting_period"].isin(selected_periods)]
 
-    if subcounty != "All":
-        selected_subcounties = subcounty.split(",")
+    if subcounties != "All":
+        selected_subcounties = subcounties.split(",")
         df = df[df["subcounty_name"].isin(selected_subcounties)]
     if funding_sources != "All":
         selected_funding_sources = funding_sources.split(",")
