@@ -19,7 +19,7 @@ function MonthSelector({
 }) {
   return (
     <div className="month-filter">
-      <label>Reporting Period</label> 
+      
 
       <div className="month-select-wrap custom-month">
         <CalendarDays size={17} />
