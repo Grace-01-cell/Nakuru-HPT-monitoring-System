@@ -3,6 +3,7 @@ import { Search, FileText } from "lucide-react";
 import api from "../api/api";
 import "./Submissions.css";
 import MonthSelector from "../components/MonthSelector";
+import MultiCheckboxFilter from "../components/MultiCheckboxFilter";
 
 function getMonthYear(dateString: string) {
   if (!dateString) return "";
@@ -33,6 +34,7 @@ interface Submission {
   subcounty_name: string;
   ward_name: string;
   reporting_month: string;
+  reporting_period: string;
 
   funding_source: string;
   procurement_source: string;
@@ -52,7 +54,12 @@ interface Submission {
   submitted_by: string;
   supporting_document: string;
 }
-
+const fundingSources = [
+  "FIF",
+  "SHIF",
+  "Facility Collection (Out of Pocket)",
+  "Partner Funding",
+];
 function money(value: number) {
   return `KES ${Number(value || 0).toLocaleString()}`;
 }
@@ -62,8 +69,9 @@ function Submissions() {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [selectedSubcounty, setSelectedSubcounty] = useState("All");
-  const [selectedMonth, setSelectedMonth] = useState("All");
+  const [selectedSubcounty, setSelectedSubcounty] = useState<string[]>(["All"]);
+  const [selectedMonth, setSelectedMonth] = useState<string[]>(["All"]);
+  const [selectedFundingSource, setSelectedFundingSource] = useState<string[]>(["All"]);
   useEffect(() => {
     api
       .get("/records")
@@ -104,18 +112,22 @@ function Submissions() {
           .includes(search.toLowerCase());
 
       const matchesSubcounty =
-        selectedSubcounty === "All"
-          ? true
-          : record.subcounty_name === selectedSubcounty;
+        selectedSubcounty.includes("All") ||
+          
+        selectedSubcounty.includes(record.subcounty_name);
 
       const matchesMonth =
-        selectedMonth === "All"
-          ? true
-          : getMonthYear(record.date_received) === selectedMonth;
+        selectedMonth.includes("All") ||
+        selectedMonth.includes(record.reporting_period);
+          
 
-      return matchesSearch && matchesSubcounty && matchesMonth;
+      const matchesFundingSource =
+        selectedFundingSource.includes("All") ||
+        selectedFundingSource.includes(record.funding_source);
+
+      return matchesSearch && matchesSubcounty && matchesMonth && matchesFundingSource;
     });
-  }, [records, search, selectedSubcounty, selectedMonth]);
+  }, [records, search, selectedSubcounty, selectedMonth, selectedFundingSource]);
 
   const totalSubmissions = filteredRecords.length;
 
@@ -143,26 +155,27 @@ function Submissions() {
       </div>
 
       <div className="dashboard-filters">
-        <div className="filter-group">
-          <label>Subcounty</label>
+  <MultiCheckboxFilter
+    label="Subcounty"
+    options={subcounties.filter((item) => item !== "All")}
+    selected={selectedSubcounty}
+    onChange={setSelectedSubcounty}
+  />
 
-          <select
-            value={selectedSubcounty}
-            onChange={(e) => setSelectedSubcounty(e.target.value)}
-          >
-            {subcounties.map((subcounty) => (
-              <option key={subcounty} value={subcounty}>
-                {subcounty}
-              </option>
-            ))}
-          </select>
-        </div>
+  <MultiCheckboxFilter
+    label="Reporting Period"
+    options={["Jan-2026", "Feb-2026", "Mar-2026", "Apr-2026", "May-2026"]}
+    selected={selectedMonth}
+    onChange={setSelectedMonth}
+  />
 
-        <div className="filter-group">
-          
-          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
-        </div>
-      </div>
+  <MultiCheckboxFilter
+    label="Funding Source"
+    options={fundingSources}
+    selected={selectedFundingSource}
+    onChange={setSelectedFundingSource}
+  />
+</div>
 
       <div className="kpi-grid">
         <div className="kpi-card">

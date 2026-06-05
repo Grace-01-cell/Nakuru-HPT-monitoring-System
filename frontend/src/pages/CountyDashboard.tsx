@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import api from "../api/api";
 import "./Dashboard.css";
+import MultiCheckboxFilter from "../components/MultiCheckboxFilter";
 import MonthSelector from "../components/MonthSelector";
 function getMonthYear(dateString: string) {
   if (!dateString) return "";
@@ -104,10 +105,12 @@ function CountyDashboard() {
   const [facilities, setFacilities] = useState<FacilityCompliance[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [selectedSubcounty, setSelectedSubcounty] = useState("All");
-  const [selectedMonth, setSelectedMonth] = useState("All");
+  const [selectedSubcounty, setSelectedSubcounty] = useState(["All"]);
+  const [selectedMonth, setSelectedMonth] = useState(["All"]);
+  const [selectedFundingSource, setSelectedFundingSource] = useState(["All"]);
   const [fundingSourceTrend, setFundingSourceTrend] = useState([]);
   const [hptAllocationTrend, setHptAllocationTrend] = useState([]);
+
   const fundingSourceChartData = Object.values(
   fundingSourceTrend.reduce((acc: any, item: any) => {
     const period = item.reporting_period;
@@ -129,8 +132,9 @@ const hptAllocationChartData = hptAllocationTrend;
   useEffect(() => {
   setLoading(true);
 
-  api
-    .get(`/dashboard/county?reporting_periods=${selectedMonth}`)
+  api.get(
+  `/dashboard/county?reporting_periods=${selectedMonth.join(",")}&subcounties=${selectedSubcounty.join(",")}&funding_sources=${selectedFundingSource.join(",")}`
+)
     .then((res) => {
       setSummary(res.data.summary);
       setFacilities(res.data.facility_compliance);
@@ -142,7 +146,7 @@ const hptAllocationChartData = hptAllocationTrend;
       alert("Failed to load dashboard data");
     })
     .finally(() => setLoading(false));
-}, [selectedMonth]);
+}, [selectedMonth, selectedSubcounty, selectedFundingSource]);
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -165,7 +169,7 @@ const hptAllocationChartData = hptAllocationTrend;
 
   const filteredFacilities = facilities.filter((facility) => {
     return (
-      selectedSubcounty === "All" || facility.subcounty_name === selectedSubcounty
+      selectedSubcounty.includes("All") || selectedSubcounty.includes(facility.subcounty_name)
     );
   });
   const filteredSummary = {
@@ -308,30 +312,35 @@ const hptAllocationChartData = hptAllocationTrend;
       </div>
 
       <div className="dashboard-filters">
-        <div className="filter-group">
-          <label>Subcounty</label>
-          <select
-            value={selectedSubcounty}
-            onChange={(e) => {
-              setSelectedSubcounty(e.target.value);
-              setPage(1);
-            }}
-          
-        
-          >
-            {subcounties.map((subcounty) => (
-              <option key={subcounty} value={subcounty}>
-                {subcounty}
-              </option>
-            ))}
-          </select>
-        </div>
-        <MonthSelector
-          value={selectedMonth}
-          onChange={setSelectedMonth}
-        />
-      </div>
+  <MultiCheckboxFilter
+    label="Subcounty"
+    options={subcounties.filter((item) => item !== "All")}
+    selected={selectedSubcounty}
+    onChange={(values) => {
+      setSelectedSubcounty(values);
+      setPage(1);
+    }}
+  />
 
+  <MultiCheckboxFilter
+    label="Reporting Period"
+    options={["Jan-2026", "Feb-2026", "Mar-2026", "Apr-2026", "May-2026"]}
+    selected={selectedMonth}
+    onChange={setSelectedMonth}
+  />
+
+  <MultiCheckboxFilter
+    label="Funding Source"
+    options={[
+      "FIF",
+      "SHIF",
+      "Facility Collection (Out of Pocket)",
+      "Partner Funding",
+    ]}
+    selected={selectedFundingSource}
+    onChange={setSelectedFundingSource}
+  />
+</div>
       <div className="kpi-grid">
         <KpiCard
           title="Total Funds Received"

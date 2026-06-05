@@ -200,7 +200,7 @@ def records():
 
 
 @app.get("/dashboard/county")
-def county_dashboard(reporting_periods: str = "All",subcounty: str = "All"):
+def county_dashboard(reporting_periods: str = "All",subcounty: str = "All", funding_sources: str = "All",):
     df = get_joined_data()
 
     if reporting_periods != "All":
@@ -210,7 +210,9 @@ def county_dashboard(reporting_periods: str = "All",subcounty: str = "All"):
     if subcounty != "All":
         selected_subcounties = subcounty.split(",")
         df = df[df["subcounty_name"].isin(selected_subcounties)]
-
+    if funding_sources != "All":
+        selected_funding_sources = funding_sources.split(",")
+        df = df[df["funding_source"].isin(selected_funding_sources)]
     df["reporting_month"] = df["reporting_period"]
     total_received = df["amount_received"].sum()
     total_hpt_allocated = df["amount_allocated_to_hpt"].sum()
