@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# FastAPI cache
+.pytest_cache/
+.mypy_cache/
+
+# Uploaded files
+uploads/
+
+
+# Local database files
+*.db
+*.sqlite3
+
+# Chroma (if ever added later)
+vectorstore/

@@ -8,8 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
+  
   XAxis,
   YAxis,
   Tooltip,
@@ -22,17 +21,8 @@ import {
 import api from "../api/api";
 import "./Dashboard.css";
 import MultiCheckboxFilter from "../components/MultiCheckboxFilter";
-import MonthSelector from "../components/MonthSelector";
-function getMonthYear(dateString: string) {
-  if (!dateString) return "";
 
-  const date = new Date(dateString);
 
-  return date.toLocaleString("en-US", {
-    month: "short",
-    year: "numeric",
-  }).replace(" ", "-");
-}
 interface Summary {
   total_amount_received: number;
   total_hpt_allocated: number;
@@ -238,13 +228,7 @@ const hptAllocationChartData = hptAllocationTrend;
 
   const submittedFacilities = filteredFacilities.length || 1;
 
-  const lowestHptFacilities = [...filteredFacilities]
-    .sort((a, b) => a.hpt_percent - b.hpt_percent)
-    .slice(0, 10);
 
-  const lowestChpFacilities = [...filteredFacilities]
-    .sort((a, b) => a.chp_kits_percent_of_hpt - b.chp_kits_percent_of_hpt)
-    .slice(0, 10);
 
   const totalPages = Math.max(
     1,
@@ -492,8 +476,8 @@ const hptAllocationChartData = hptAllocationTrend;
           />
 
           <Tooltip
-            formatter={(value: number) =>
-              `KES ${Number(value).toLocaleString()}`
+            formatter={(value) =>
+              `KES ${Number(value || 0).toLocaleString()}`
             }
           />
 
@@ -526,8 +510,8 @@ const hptAllocationChartData = hptAllocationTrend;
           />
 
           <Tooltip
-            formatter={(value: number) =>
-              `KES ${Number(value).toLocaleString()}`
+            formatter={(value) =>
+              `KES ${Number(value || 0).toLocaleString()}`
             }
           />
 

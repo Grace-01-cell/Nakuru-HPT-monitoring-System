@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Building2,
   Wallet,
-  Percent,
+  
   Upload,
   FileText,
 } from "lucide-react";
@@ -25,9 +25,7 @@ interface Facility {
   facility_name: string;
 }
 
-function money(value: number) {
-  return `KES ${Number(value || 0).toLocaleString()}`;
-}
+
 
 function DataCollection() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -64,33 +62,7 @@ function DataCollection() {
     }));
   }
 
-  const calculations = useMemo(() => {
-    const amountReceived = Number(cleanNumber(form.amount_received) || 0);
-    const hptAllocated = Number(cleanNumber(form.amount_allocated_to_hpt) || 0);
-    const hptSpent = Number(cleanNumber(form.amount_spent_on_hpt) || 0);
-    const chpKits = Number(cleanNumber(form.amount_used_for_chp_kits) || 0);
-
-    const balance = hptAllocated - hptSpent;
-
-    const hptPercent =
-      amountReceived > 0
-        ? ((hptAllocated / amountReceived) * 100).toFixed(2)
-        : "0.00";
-
-    const requiredChpAmount = hptAllocated * 0.05;
-
-    const chpPercent =
-      hptAllocated > 0
-        ? ((chpKits / hptAllocated) * 100).toFixed(2)
-        : "0.00";
-
-    return {
-      balance,
-      hptPercent,
-      requiredChpAmount,
-      chpPercent,
-    };
-  }, [form]);
+  
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

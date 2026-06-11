@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import DataCollection from "./pages/DataCollection";
 import MainLayout from "./components/layout/MainLayout";
-import Submissions from "./pages/Submisions";
+import Submissions from "./pages/Submissions";
 import FacilityTrends from "./pages/FacilityTrends";
 
 import CountyDashboard from "./pages/CountyDashboard";

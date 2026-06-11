@@ -2,32 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, FileText } from "lucide-react";
 import api from "../api/api";
 import "./Submissions.css";
-import MonthSelector from "../components/MonthSelector";
+
 import MultiCheckboxFilter from "../components/MultiCheckboxFilter";
 
-function getMonthYear(dateString: string) {
-  if (!dateString) return "";
 
-  const value = String(dateString).trim();
-
-  let date: Date;
-
-  if (value.includes("/")) {
-    const [day, month, year] = value.split("/");
-    date = new Date(Number(year), Number(month) - 1, Number(day));
-  } else {
-    date = new Date(value);
-  }
-
-  if (isNaN(date.getTime())) return "";
-
-  return date
-    .toLocaleString("en-US", {
-      month: "short",
-      year: "numeric",
-    })
-    .replace(" ", "-");
-}
 interface Submission {
   mfl_code: string;
   facility_name: string;
