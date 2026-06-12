@@ -52,7 +52,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
             "success": False,
             "message": "User already exists",
         }
-
+    approved = payload.role == "facility"  # Facility users are auto-approved, others require admin approval
     new_user = User(
         first_name=payload.first_name,
         last_name=payload.last_name,
@@ -63,7 +63,8 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         facility_name=payload.facility_name,
         subcounty_name=payload.subcounty_name,
         is_active=True,
-        is_approved=False,
+        is_approved=approved,
+        
     )
 
     db.add(new_user)
