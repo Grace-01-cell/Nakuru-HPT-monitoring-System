@@ -5,9 +5,11 @@ import MainLayout from "./components/layout/MainLayout";
 import Submissions from "./pages/Submissions";
 import FacilityTrends from "./pages/FacilityTrends";
 import Register from "./pages/Register";
+import AdminUsers from "./pages/AdminUsers";
 
 import CountyDashboard from "./pages/CountyDashboard";
-<Route path="/dashboard" element={<CountyDashboard />} />
+
+
 function Placeholder({ title }: { title: string }) {
   return (
     <div>
@@ -36,6 +38,7 @@ function App() {
           <Route path="/users" element={<Placeholder title="Users" />} />
           <Route path="/settings" element={<Placeholder title="Settings" />} />
           <Route path="/facilities" element={<FacilityTrends />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,26 +1,65 @@
+import type React from "react";
 import {
   LayoutDashboard,
   ClipboardList,
   FileText,
   Building2,
-  
   Settings,
   LogOut,
+  Users,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import "./Layout.css";
 
-const menuItems = [
-  
-  { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
-  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-  { label: "Submissions", path: "/submissions", icon: FileText },
-  { label: "Facilities", path: "/facilities", icon: Building2 },
-  
-  { label: "Settings", path: "/settings", icon: Settings },
-];
-
 function Sidebar() {
+  const navigate = useNavigate();
+
+  const user = JSON.parse(localStorage.getItem("hpt_user") || "{}");
+  const role = user?.role || "facility";
+
+  const menuItems: {
+  label: string;
+  path: string;
+  icon: React.ElementType;
+}[] = [];
+
+  // Facility User
+  if (role === "facility") {
+    menuItems.push(
+      { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
+      { label: "Facilities", path: "/facilities", icon: Building2 }
+    );
+  }
+
+  // County User
+  if (role === "county") {
+    menuItems.push(
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Submissions", path: "/submissions", icon: FileText },
+      { label: "Facilities", path: "/facilities", icon: Building2 }
+    );
+  }
+
+  // Admin User
+  if (role === "admin") {
+    menuItems.push(
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
+      { label: "Submissions", path: "/submissions", icon: FileText },
+      { label: "Facilities", path: "/facilities", icon: Building2 },
+      { label: "User Management", path: "/admin/users", icon: Users },
+      { label: "Settings", path: "/settings", icon: Settings }
+    );
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("hpt_user");
+    navigate("/");
+  }
+
+  const initials =
+    `${user?.first_name?.[0] || ""}${user?.last_name?.[0] || ""}`.toUpperCase();
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -52,14 +91,16 @@ function Sidebar() {
 
       <div className="sidebar-footer">
         <div className="user-box">
-          <div className="avatar">JD</div>
+          <div className="avatar">{initials || "U"}</div>
           <div>
-            <strong>Jane Doe</strong>
-            <p>County Viewer</p>
+            <strong>
+              {user?.first_name} {user?.last_name}
+            </strong>
+            <p>{role}</p>
           </div>
         </div>
 
-        <button className="logout-btn">
+        <button className="logout-btn" onClick={handleLogout}>
           <LogOut size={18} />
           Logout
         </button>
