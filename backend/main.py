@@ -4,8 +4,15 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 import shutil
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from database import Base, engine, get_db
+from models import User
+from auth import router as auth_router
 
 app = FastAPI(title="Nakuru HPT Monitoring API")
+Base.metadata.create_all(bind=engine)
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,

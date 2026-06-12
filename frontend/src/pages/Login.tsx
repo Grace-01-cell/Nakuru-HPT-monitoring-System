@@ -1,17 +1,41 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, Lock, Mail, UserPlus, Users, Building2, LogIn } from "lucide-react";
+import api from "../api/api";
 import "./Login.css";
 
 function Login() {
   const [role, setRole] = useState("facility");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  function handleDemoLogin() {
-    if (role === "facility") {
-      navigate("/data-collection");
-    } else {
-      navigate("/dashboard");
+  async function handleLogin() {
+    try {
+      const res = await api.post("/auth/login", {
+        email,
+        password,
+      });
+
+      if (!res.data.success) {
+        alert(res.data.message || "Login failed");
+        return;
+      }
+
+      const user = res.data.user;
+
+      localStorage.setItem("hpt_user", JSON.stringify(user));
+
+      if (user.role === "facility") {
+        navigate("/data-collection");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Unable to login. Please try again.");
     }
   }
 
@@ -32,13 +56,28 @@ function Login() {
 
             <div className="input-group">
               <Mail size={22} />
-              <input type="text" placeholder="Email or username" />
+              <input
+                type="text"
+                placeholder="Email or username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
 
             <div className="input-group">
               <Lock size={22} />
-              <input type="password" placeholder="Password" />
-              <Eye size={22} className="right-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Eye
+                size={22}
+                className="right-icon"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ cursor: "pointer" }}
+              />
             </div>
 
             <div className="input-group">
@@ -46,10 +85,11 @@ function Login() {
               <select value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="facility">Facility User</option>
                 <option value="county">County / National User</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
 
-            <button className="sign-in-btn" onClick={handleDemoLogin}>
+            <button className="sign-in-btn" onClick={handleLogin}>
               <LogIn size={24} />
               Sign In
             </button>
@@ -60,7 +100,7 @@ function Login() {
 
             <button
               className="create-account-btn"
-              onClick={() => alert("Demo version: account creation will be enabled later.")}
+              onClick={() => navigate("/register")}
             >
               <UserPlus size={22} />
               Create Account
@@ -68,7 +108,7 @@ function Login() {
 
             <button
               className="forgot-btn"
-              onClick={() => alert("Demo version: password reset will be enabled later.")}
+              onClick={() => alert("Password reset will be enabled later.")}
             >
               Forgot your password?
             </button>

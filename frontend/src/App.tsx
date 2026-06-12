@@ -4,6 +4,7 @@ import DataCollection from "./pages/DataCollection";
 import MainLayout from "./components/layout/MainLayout";
 import Submissions from "./pages/Submissions";
 import FacilityTrends from "./pages/FacilityTrends";
+import Register from "./pages/Register";
 
 import CountyDashboard from "./pages/CountyDashboard";
 <Route path="/dashboard" element={<CountyDashboard />} />
@@ -20,6 +21,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/register" element={<Register />} />
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
 
