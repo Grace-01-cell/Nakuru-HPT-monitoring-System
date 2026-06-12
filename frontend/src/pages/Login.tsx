@@ -1,9 +1,19 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, Lock, Mail, UserPlus, Users, Building2, LogIn } from "lucide-react";
 import "./Login.css";
 
 function Login() {
   const [role, setRole] = useState("facility");
+  const navigate = useNavigate();
+
+  function handleDemoLogin() {
+    if (role === "facility") {
+      navigate("/data-collection");
+    } else {
+      navigate("/dashboard");
+    }
+  }
 
   return (
     <div className="login-page">
@@ -39,7 +49,7 @@ function Login() {
               </select>
             </div>
 
-            <button className="sign-in-btn">
+            <button className="sign-in-btn" onClick={handleDemoLogin}>
               <LogIn size={24} />
               Sign In
             </button>
@@ -48,12 +58,20 @@ function Login() {
 
             <p className="small-text">Don’t have an account?</p>
 
-            <button className="create-account-btn">
+            <button
+              className="create-account-btn"
+              onClick={() => alert("Demo version: account creation will be enabled later.")}
+            >
               <UserPlus size={22} />
               Create Account
             </button>
 
-            <button className="forgot-btn">Forgot your password?</button>
+            <button
+              className="forgot-btn"
+              onClick={() => alert("Demo version: password reset will be enabled later.")}
+            >
+              Forgot your password?
+            </button>
           </section>
 
           <aside className="info-card">
