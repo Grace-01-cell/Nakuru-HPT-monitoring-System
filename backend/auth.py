@@ -180,7 +180,45 @@ def get_users(db: Session = Depends(get_db)):
             "facility_name": user.facility_name,
             "subcounty_name": user.subcounty_name,
             "is_active": user.is_active,
+            "is_approved": user.is_approved,
             "created_at": user.created_at,
         }
         for user in users
     ]
+@router.put("/users/{user_id}/approve")
+def approve_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    user.is_approved = True
+    db.commit()
+
+    return {"success": True, "message": "User approved successfully"}
+
+
+@router.put("/users/{user_id}/deactivate")
+def deactivate_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    user.is_active = False
+    db.commit()
+
+    return {"success": True, "message": "User deactivated successfully"}
+
+
+@router.put("/users/{user_id}/activate")
+def activate_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    user.is_active = True
+    db.commit()
+
+    return {"success": True, "message": "User activated successfully"}
