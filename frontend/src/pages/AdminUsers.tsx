@@ -51,6 +51,17 @@ function AdminUsers() {
     await loadUsers();
   }
 
+  async function deleteUser(userId: number) {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to permanently delete this user?"
+    );
+
+    if (!confirmDelete) return;
+
+    await api.delete(`/auth/users/${userId}/delete`);
+    await loadUsers();
+  }
+
   if (loading) {
     return <div className="admin-users-page">Loading users...</div>;
   }
@@ -159,6 +170,13 @@ function AdminUsers() {
                       Activate
                     </button>
                   )}
+
+                  <button
+                    className="delete-btn"
+                    onClick={() => deleteUser(user.user_id)}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

@@ -222,3 +222,14 @@ def activate_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"success": True, "message": "User activated successfully"}
+@router.delete("/users/{user_id}/delete")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    db.delete(user)
+    db.commit()
+
+    return {"success": True, "message": "User deleted successfully"}

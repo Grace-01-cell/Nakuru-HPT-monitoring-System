@@ -128,3 +128,12 @@
   color: #64748b;
   padding: 30px;
 }
+.delete-btn {
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #7f1d1d;
+  color: white;
+}
