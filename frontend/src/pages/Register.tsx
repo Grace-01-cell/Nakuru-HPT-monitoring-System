@@ -67,9 +67,15 @@ function Register() {
       return;
     }
 
-    alert("Account created. Please wait for administrator approval.");
+ 
+    const message =
+    form.role === "facility"
+      ? "Account created successfully. You can now login."
+      : "Account created. Please wait for administrator approval.";
+    alert(message);
     navigate("/");
   }
+
 
   return (
     <div className="login-page">

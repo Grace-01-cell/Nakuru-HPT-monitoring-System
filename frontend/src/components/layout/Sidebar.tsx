@@ -24,33 +24,34 @@ function Sidebar() {
 }[] = [];
 
   // Facility User
-  if (role === "facility") {
-    menuItems.push(
-      { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
-      { label: "Facilities", path: "/facilities", icon: Building2 }
-    );
-  }
+  // Facility User
+if (role === "facility") {
+  menuItems.push(
+    { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
+    { label: "Facility Trends", path: "/facilities", icon: Building2 }
+  );
+}
 
-  // County User
-  if (role === "county") {
-    menuItems.push(
-      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-      { label: "Submissions", path: "/submissions", icon: FileText },
-      { label: "Facilities", path: "/facilities", icon: Building2 }
-    );
-  }
+// County User
+if (role === "county") {
+  menuItems.push(
+    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Submissions", path: "/submissions", icon: FileText },
+    { label: "Facility Trends", path: "/facilities", icon: Building2 }
+  );
+}
 
-  // Admin User
-  if (role === "admin") {
-    menuItems.push(
-      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-      { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
-      { label: "Submissions", path: "/submissions", icon: FileText },
-      { label: "Facilities", path: "/facilities", icon: Building2 },
-      { label: "User Management", path: "/admin/users", icon: Users },
-      { label: "Settings", path: "/settings", icon: Settings }
-    );
-  }
+// Admin User
+if (role === "admin") {
+  menuItems.push(
+    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
+    { label: "Submissions", path: "/submissions", icon: FileText },
+    { label: "Facility Trends", path: "/facilities", icon: Building2 },
+    { label: "User Management", path: "/admin/users", icon: Users },
+    { label: "Settings", path: "/settings", icon: Settings }
+  );
+}
 
   function handleLogout() {
     localStorage.removeItem("hpt_user");
