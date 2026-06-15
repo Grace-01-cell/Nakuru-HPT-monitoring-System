@@ -9,10 +9,16 @@ from fastapi import Depends
 from database import Base, engine, get_db
 from models import User
 from auth import router as auth_router
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Nakuru HPT Monitoring API")
-Base.metadata.create_all(bind=engine)
 app.include_router(auth_router)
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = BASE_DIR / "uploads"
+
+UPLOAD_DIR.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,9 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-UPLOAD_DIR = BASE_DIR / "uploads"
+
 
 FACILITY_FILE = DATA_DIR / "facility_master.xlsx"
 HPT_FILE = DATA_DIR / "hpt_records.xlsx"

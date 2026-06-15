@@ -75,7 +75,7 @@ function DataCollection() {
       const data = new FormData();
 
       
-        data.append("mfl_code", form.mfl_code);
+        data.append("mfl_code",isFacilityUser ? user.facility_mfl_code : form.mfl_code);
         data.append("amount_received", cleanNumber(form.amount_received));
         data.append("funding_source", form.funding_source);
         data.append("reporting_period", form.reporting_period);

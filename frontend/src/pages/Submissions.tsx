@@ -277,10 +277,15 @@ function Submissions() {
 
                   <td>
                     {record.supporting_document ? (
-                      <button className="view-doc-btn">
-                        <FileText size={14} />
+                      <button className="view-doc-btn" onClick={() => {
+                        const baseUrl =import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+                        window.open(`${baseUrl}${record.supporting_document}`, "_blank");
+                      }}>
+                        <FileText size={18} />
                         View
                       </button>
+
+                        
                     ) : (
                       "—"
                     )}
