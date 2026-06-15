@@ -84,7 +84,7 @@ function Login() {
               <Users size={22} />
               <select value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="facility">Facility User</option>
-                <option value="county">County / National User</option>
+                <option value="county">County / Sub County User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -128,8 +128,8 @@ function Login() {
             <div className="info-item">
               <Users size={34} />
               <div>
-                <h4>County / National Users</h4>
-                <p>County and national teams can view reports, dashboards and analytics.</p>
+                <h4>County / Sub County Users</h4>
+                <p>County and sub county teams can view reports, dashboards and analytics.</p>
               </div>
             </div>
 

@@ -145,7 +145,7 @@ function Register() {
                 }
               >
                 <option value="facility">Facility User</option>
-                <option value="county">County / National User</option>
+                <option value="county">County / Sub County User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>

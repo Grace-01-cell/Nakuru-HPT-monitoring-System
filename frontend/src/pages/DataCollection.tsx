@@ -28,6 +28,8 @@ interface Facility {
 
 
 function DataCollection() {
+  const user = JSON.parse(localStorage.getItem("hpt_user") || "{}");
+  const isFacilityUser = user?.role === "facility";
   const [facilities, setFacilities] = useState<Facility[]>([]);
 
   const [form, setForm] = useState({
@@ -147,25 +149,32 @@ data.append("submitted_by", form.submitted_by);
 
           <div className="form-group">
             <label>Facility</label>
+            {isFacilityUser ? (
+              <input
+                type="text"
+                value={user.facility_name || ""}
+                disabled
+              />
+            ) : (
+              <select
+                value={form.mfl_code}
+                onChange={(e) =>
+                  updateField("mfl_code", e.target.value)
+                }
+                required
+              >
+                <option value="">Select facility</option>
 
-            <select
-              value={form.mfl_code}
-              onChange={(e) =>
-                updateField("mfl_code", e.target.value)
-              }
-              required
-            >
-              <option value="">Select facility</option>
-
-              {facilities.map((facility) => (
-                <option
-                  key={facility.mfl_code}
-                  value={facility.mfl_code}
-                >
-                  {facility.facility_name}
-                </option>
-              ))}
-            </select>
+                {facilities.map((facility) => (
+                  <option
+                    key={facility.mfl_code}
+                    value={facility.mfl_code}
+                  >
+                    {facility.facility_name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="section-title">
