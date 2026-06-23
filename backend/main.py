@@ -12,24 +12,30 @@ from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Nakuru HPT Monitoring API")
-app.include_router(auth_router)
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = BASE_DIR / "uploads"
 
 UPLOAD_DIR.mkdir(exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173","http://localhost:5174","http://127.0.0.1:5174","https://nakuru-hpt-dashboard-cdu36.ondigitalocean.app",],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "https://nakuru-hpt-dashboard-cdu36.ondigitalocean.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 
-
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 FACILITY_FILE = DATA_DIR / "facility_master.xlsx"
 HPT_FILE = DATA_DIR / "hpt_records.xlsx"
 

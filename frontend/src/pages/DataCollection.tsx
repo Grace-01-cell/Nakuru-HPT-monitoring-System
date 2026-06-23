@@ -1,125 +1,273 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Wallet,
-  
   Upload,
   FileText,
+  ArrowRight,
+  ArrowLeft,
+  Send,
+  Info,
 } from "lucide-react";
 import api from "../api/api";
-import MonthSelector from "../components/MonthSelector";
 import "./DataCollection.css";
+
 function formatNumber(value: string) {
   const raw = value.replace(/,/g, "").replace(/[^\d]/g, "");
-
   if (!raw) return "";
-
   return Number(raw).toLocaleString();
 }
 
 function cleanNumber(value: string) {
   return value.replace(/,/g, "");
 }
+
+function toNumber(value: string) {
+  return Number(cleanNumber(value) || 0);
+}
+
+function money(value: number) {
+  return `KES ${value.toLocaleString()}`;
+}
+
 interface Facility {
   mfl_code: string;
   facility_name: string;
 }
 
+const fundingSources = [
+  "County Allocation",
+  "FIF",
+  "SHIF",
+  "PHC",
+  "Partners",
+  "Donations",
+];
 
+const procurementSources = ["KEMSA", "MEDS", "Prequalified Suppliers"];
+
+const hptCategories = [
+  "Medicines",
+  "Medical Supplies",
+  "Radiology",
+  "Nutrition",
+  "Diagnostics",
+  "Immunization",
+];
 
 function DataCollection() {
   const user = JSON.parse(localStorage.getItem("hpt_user") || "{}");
   const isFacilityUser = user?.role === "facility";
+
+  const [step, setStep] = useState(1);
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [document, setDocument] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   const [form, setForm] = useState({
     mfl_code: "",
-    amount_received: "",
-    funding_source: "",
-    reporting_period: "All",
+    reporting_year: String(currentYear),
+    reporting_month: "",
+    no_funds_received: false,
     date_received: "",
-    amount_allocated_to_hpt: "",
-    amount_spent_on_hpt: "",
     amount_used_for_chp_kits: "",
-    submitted_by: "facility_user",
-    procurement_source: "",
+    submitter_name: "",
+    submitter_phone: "",
+    submitter_designation: "",
+    declaration: false,
   });
 
-  const [document, setDocument] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [funding, setFunding] = useState(
+    fundingSources.map((source) => ({
+      source,
+      selected: false,
+      amount: "",
+    }))
+  );
+
+  const [procurement, setProcurement] = useState<string[]>([]);
+
+  const [categories, setCategories] = useState(
+    hptCategories.map((category) => ({
+      category,
+      allocated: "",
+      spent: "",
+    }))
+  );
 
   useEffect(() => {
     api
       .get("/facilities")
-      .then((res) => {
-        setFacilities(res.data);
-      })
+      .then((res) => setFacilities(res.data))
       .catch((err) => console.error(err));
   }, []);
 
-  function updateField(field: string, value: string) {
+  function updateField(field: string, value: string | boolean) {
     setForm((prev) => ({
       ...prev,
       [field]: value,
     }));
   }
 
-  
+  const selectedFacility = facilities.find(
+    (facility) => facility.mfl_code === form.mfl_code
+  );
+
+  const facilityName = isFacilityUser
+    ? user.facility_name || ""
+    : selectedFacility?.facility_name || "";
+
+  const facilityMfl = isFacilityUser
+    ? user.facility_mfl_code || ""
+    : form.mfl_code;
+
+  const totalFunding = useMemo(() => {
+    if (form.no_funds_received) return 0;
+    return funding.reduce(
+      (sum, item) => sum + (item.selected ? toNumber(item.amount) : 0),
+      0
+    );
+  }, [funding, form.no_funds_received]);
+
+  const totalAllocatedToHpt = useMemo(() => {
+    if (form.no_funds_received) return 0;
+    return categories.reduce((sum, item) => sum + toNumber(item.allocated), 0);
+  }, [categories, form.no_funds_received]);
+
+  const totalSpentOnHpt = useMemo(() => {
+    if (form.no_funds_received) return 0;
+    return categories.reduce((sum, item) => sum + toNumber(item.spent), 0);
+  }, [categories, form.no_funds_received]);
+
+  const requiredHptAllocation = totalFunding * 0.4;
+  const requiredChpKits = requiredHptAllocation * 0.05;
+  const hptPercent =
+    totalFunding > 0 ? (totalAllocatedToHpt / totalFunding) * 100 : 0;
+
+  const complianceStatus =
+    totalFunding === 0
+      ? "No Funds Received"
+      : hptPercent >= 40
+      ? `Compliant (${hptPercent.toFixed(2)}%)`
+      : `Non-compliant (${hptPercent.toFixed(2)}%)`;
+
+  function toggleFunding(index: number) {
+    setFunding((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              selected: !item.selected,
+              amount: !item.selected ? item.amount : "",
+            }
+          : item
+      )
+    );
+  }
+
+  function updateFundingAmount(index: number, value: string) {
+    setFunding((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              selected: true,
+              amount: formatNumber(value),
+            }
+          : item
+      )
+    );
+  }
+
+  function toggleProcurement(source: string) {
+    setProcurement((prev) =>
+      prev.includes(source)
+        ? prev.filter((item) => item !== source)
+        : [...prev, source]
+    );
+  }
+
+  function updateCategory(
+    index: number,
+    field: "allocated" | "spent",
+    value: string
+  ) {
+    setCategories((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, [field]: formatNumber(value) } : item
+      )
+    );
+  }
+
+  function handleNoFundsChange(checked: boolean) {
+    updateField("no_funds_received", checked);
+
+    if (checked) {
+      setFunding((prev) =>
+        prev.map((item) => ({ ...item, selected: false, amount: "" }))
+      );
+      setCategories((prev) =>
+        prev.map((item) => ({ ...item, allocated: "", spent: "" }))
+      );
+      updateField("amount_used_for_chp_kits", "");
+      updateField("date_received", "");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!form.declaration) {
+      alert("Please confirm the declaration before submitting.");
+      return;
+    }
+
+    if (!form.no_funds_received && !form.date_received) {
+      alert("Please select the date received.");
+      return;
+    }
 
     try {
       setSubmitting(true);
 
       const data = new FormData();
 
-      
-        data.append("mfl_code",isFacilityUser ? user.facility_mfl_code : form.mfl_code);
-        data.append("amount_received", cleanNumber(form.amount_received));
-        data.append("funding_source", form.funding_source);
-        data.append("reporting_period", form.reporting_period);
-        data.append("procurement_source", form.procurement_source);
-        data.append("date_received", form.date_received);
-        data.append(
-          "amount_allocated_to_hpt",
-  cleanNumber(form.amount_allocated_to_hpt)
-);
-
-data.append(
-  "amount_spent_on_hpt",
-  cleanNumber(form.amount_spent_on_hpt)
-) ;   
-
-data.append(
-  "amount_used_for_chp_kits",
-  cleanNumber(form.amount_used_for_chp_kits)
-);
-data.append("submitted_by", form.submitted_by);
-      
+      data.append("mfl_code", facilityMfl);
+      data.append("amount_received", String(totalFunding));
+      data.append(
+        "funding_source",
+        form.no_funds_received
+          ? "No Funds Received"
+          : funding
+              .filter((item) => item.selected)
+              .map((item) => `${item.source}: ${cleanNumber(item.amount)}`)
+              .join("; ")
+      );
+      data.append(
+        "reporting_period",
+        `${form.reporting_year}-${form.reporting_month}`
+      );
+      data.append("procurement_source", procurement.join(", "));
+      data.append("date_received", form.date_received);
+      data.append("amount_allocated_to_hpt", String(totalAllocatedToHpt));
+      data.append("amount_spent_on_hpt", String(totalSpentOnHpt));
+      data.append(
+        "amount_used_for_chp_kits",
+        String(toNumber(form.amount_used_for_chp_kits))
+      );
+      data.append(
+        "submitted_by",
+        `${form.submitter_name} | ${form.submitter_phone} | ${form.submitter_designation}`
+      );
 
       if (document) {
         data.append("supporting_document", document);
       }
-      
+
       await api.post("/submit-record", data);
 
       alert("Record submitted successfully");
-
-      setForm({
-        mfl_code: "",
-        amount_received: "",
-        funding_source: "",
-        reporting_period: "All",
-        date_received: "",
-        amount_allocated_to_hpt: "",
-        amount_spent_on_hpt: "",
-        amount_used_for_chp_kits: "",
-        submitted_by: "facility_user",
-        procurement_source: "",
-      });
-
-      setDocument(null);
     } catch (error) {
       console.error(error);
       alert("Failed to submit record");
@@ -131,230 +279,446 @@ data.append("submitted_by", form.submitted_by);
   return (
     <div className="collection-page">
       <div className="page-header">
-        <h2>Data Collection</h2>
-
-        <p>
-          Submit facility HPT funding records and supporting documents.
-        </p>
+        <h2>HPT Data Collection</h2>
+        <p>Submit facility HPT funding records and supporting documents.</p>
       </div>
 
-      <div className="collection-grid">
-        <form className="collection-card" onSubmit={handleSubmit}>
-          <h3>Add HPT Funds Record</h3>
+      <form className="collection-card" onSubmit={handleSubmit}>
+        <div className="step-header">
+          <h3>
+            {step === 1
+              ? "Step 1: Funding & HPT Information"
+              : "Step 2: Supporting Documents & Submitter Details"}
+          </h3>
+          <span>Step {step} of 2</span>
+        </div>
 
-          <div className="section-title">
-            <Building2 size={18} />
-            <span>Facility Information</span>
-          </div>
+        {step === 1 && (
+          <>
+            <div className="info-box">
+              <Info size={22} />
+              <div>
+                <strong>HPT Funding Requirements</strong>
+                <p>
+                  At least <b>40%</b> of the Approved/Allocated Amount should be
+                  allocated to HPT. At least <b>5%</b> of the HPT allocation
+                  should be used for CHP Kits.
+                </p>
+              </div>
+            </div>
 
-          <div className="form-group">
-            <label>Facility</label>
-            {isFacilityUser ? (
-              <input
-                type="text"
-                value={user.facility_name || ""}
-                disabled
-              />
-            ) : (
-              <select
-                value={form.mfl_code}
-                onChange={(e) =>
-                  updateField("mfl_code", e.target.value)
-                }
-                required
-              >
-                <option value="">Select facility</option>
+            <div className="section-title">
+              <Building2 size={18} />
+              <span>Facility Information</span>
+            </div>
 
-                {facilities.map((facility) => (
-                  <option
-                    key={facility.mfl_code}
-                    value={facility.mfl_code}
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Facility Name</label>
+                {isFacilityUser ? (
+                  <input type="text" value={facilityName} disabled />
+                ) : (
+                  <select
+                    value={form.mfl_code}
+                    onChange={(e) => updateField("mfl_code", e.target.value)}
+                    required
                   >
-                    {facility.facility_name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+                    <option value="">Select facility</option>
+                    {facilities.map((facility) => (
+                      <option
+                        key={facility.mfl_code}
+                        value={facility.mfl_code}
+                      >
+                        {facility.facility_name} - {facility.mfl_code}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-          <div className="section-title">
-            <Wallet size={18} />
-            <span>Financial Information</span>
-          </div>
+              <div className="form-group">
+                <label>MFL Code</label>
+                <input type="text" value={facilityMfl} disabled />
+              </div>
 
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Amount Received</label>
+              <div className="form-group">
+                <label>Reporting Year</label>
+                <select
+                  value={form.reporting_year}
+                  onChange={(e) =>
+                    updateField("reporting_year", e.target.value)
+                  }
+                  required
+                >
+                  {[currentYear - 1, currentYear, currentYear + 1].map(
+                    (year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
 
-              <input
-                type="text"
-                value={form.amount_received}
-                onChange={(e) =>
-                  updateField("amount_received", formatNumber(e.target.value))
-                }
-                placeholder="Enter amount received"
-                required
-              />
+              <div className="form-group">
+                <label>Reporting Month</label>
+                <select
+                  value={form.reporting_month}
+                  onChange={(e) =>
+                    updateField("reporting_month", e.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select month</option>
+                  {[
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                  ].map((month) => (
+                    <option key={month}>{month}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group checkbox-line">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.no_funds_received}
+                    onChange={(e) => handleNoFundsChange(e.target.checked)}
+                  />
+                  No funds received this month
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label>Date Received</label>
+                <input
+                  type="date"
+                  value={form.date_received}
+                  disabled={form.no_funds_received}
+                  onChange={(e) => updateField("date_received", e.target.value)}
+                  required={!form.no_funds_received}
+                />
+              </div>
             </div>
 
-            <div className="form-group">
-              <label>Funding Source</label>
+            <div className="section-title">
+              <Wallet size={18} />
+              <span>Funding Sources</span>
+            </div>
 
-              <select
-                value={form.funding_source}
-                onChange={(e) =>
-                  updateField("funding_source", e.target.value)
-                }
-                required
+            <p className="helper-text">
+              For County Allocation, enter the Allocated Amount. For SHIF, PHC,
+              FIF, Partners and Donations, enter the Approved Amount (AIE).
+            </p>
+
+            <div className="funding-layout">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Funding Source</th>
+                    <th>Approved AIE / Allocated Amount (KES)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funding.map((item, index) => (
+                    <tr key={item.source}>
+                      <td>
+                        <label className="table-check">
+                          <input
+                            type="checkbox"
+                            checked={item.selected}
+                            disabled={form.no_funds_received}
+                            onChange={() => toggleFunding(index)}
+                          />
+                          {item.source}
+                        </label>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={item.amount}
+                          disabled={form.no_funds_received || !item.selected}
+                          onChange={(e) =>
+                            updateFundingAmount(index, e.target.value)
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="total-row">
+                    <td>Total Funding</td>
+                    <td>{money(totalFunding)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="summary-panel">
+                <div>
+                  <span>Total Funding</span>
+                  <strong>{money(totalFunding)}</strong>
+                </div>
+                <div>
+                  <span>Required HPT Allocation (40%)</span>
+                  <strong>{money(requiredHptAllocation)}</strong>
+                </div>
+                <div>
+                  <span>Required CHP Kits Amount (5% of HPT)</span>
+                  <strong>{money(requiredChpKits)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="two-column-section">
+              <div>
+                <div className="section-title">
+                  <span>Procurement Sources</span>
+                </div>
+
+                <div className="checkbox-list">
+                  {procurementSources.map((source) => (
+                    <label key={source}>
+                      <input
+                        type="checkbox"
+                        checked={procurement.includes(source)}
+                        disabled={form.no_funds_received}
+                        onChange={() => toggleProcurement(source)}
+                      />
+                      {source}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="section-title">
+                  <span>HPT Category Breakdown</span>
+                </div>
+
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>HPT Category</th>
+                      <th>Amount Allocated (KES)</th>
+                      <th>Amount Spent (KES)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((item, index) => (
+                      <tr key={item.category}>
+                        <td>{item.category}</td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.allocated}
+                            disabled={form.no_funds_received}
+                            onChange={(e) =>
+                              updateCategory(index, "allocated", e.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.spent}
+                            disabled={form.no_funds_received}
+                            onChange={(e) =>
+                              updateCategory(index, "spent", e.target.value)
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="total-row">
+                      <td>Total</td>
+                      <td>{money(totalAllocatedToHpt)}</td>
+                      <td>{money(totalSpentOnHpt)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="hpt-summary">
+              <div>
+                <span>Amount Allocated to HPT</span>
+                <strong>{money(totalAllocatedToHpt)}</strong>
+              </div>
+
+              <div>
+                <span>Amount Spent on HPT</span>
+                <strong>{money(totalSpentOnHpt)}</strong>
+              </div>
+
+              <div>
+                <span>Amount Used for CHP Kits</span>
+                <input
+                  type="text"
+                  value={form.amount_used_for_chp_kits}
+                  disabled={form.no_funds_received}
+                  onChange={(e) =>
+                    updateField(
+                      "amount_used_for_chp_kits",
+                      formatNumber(e.target.value)
+                    )
+                  }
+                  placeholder="Enter amount"
+                />
+              </div>
+
+              <div>
+                <span>HPT Compliance Status</span>
+                <strong>{complianceStatus}</strong>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                className="submit-btn"
+                onClick={() => setStep(2)}
               >
-                <option value="">Select funding source</option>
-                <option>County Allocation</option>
-                <option>FIF</option>
-                <option>SHA</option>
-                <option>SHIF</option>
-                <option>Facility Collection (Out of Pocket)</option>
+                Next <ArrowRight size={18} />
+              </button>
+            </div>
+          </>
+        )}
 
-                <option>Partner Funding</option>
-              </select>
+        {step === 2 && (
+          <>
+            <div className="two-column-section">
+              <div>
+                <div className="section-title">
+                  <FileText size={18} />
+                  <span>Supporting Documents</span>
+                </div>
+
+                <div className="info-box warning">
+                  <div>
+                    <strong>PDF files only</strong>
+                    <p>Examples of required supporting documents:</p>
+                    <ul>
+                      <li>Allocation Drawing Rights (ADR)</li>
+                      <li>Invoice</li>
+                      <li>Requisition</li>
+                      <li>Distribution List</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <label className="upload-box">
+                  <Upload size={28} />
+                  <span>
+                    {document ? document.name : "Choose PDF supporting document"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    hidden
+                    onChange={(e) =>
+                      setDocument(e.target.files?.[0] || null)
+                    }
+                  />
+                </label>
+              </div>
+
+              <div>
+                <div className="section-title">
+                  <span>Submitter Details</span>
+                </div>
+
+                <div className="form-group">
+                  <label>Submitter Name</label>
+                  <input
+                    type="text"
+                    value={form.submitter_name}
+                    onChange={(e) =>
+                      updateField("submitter_name", e.target.value)
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Phone Number</label>
+                  <input
+                    type="text"
+                    value={form.submitter_phone}
+                    onChange={(e) =>
+                      updateField("submitter_phone", e.target.value)
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Designation</label>
+                  <input
+                    type="text"
+                    value={form.submitter_designation}
+                    onChange={(e) =>
+                      updateField("submitter_designation", e.target.value)
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="declaration-box">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.declaration}
+                      onChange={(e) =>
+                        updateField("declaration", e.target.checked)
+                      }
+                    />
+                    I confirm that the information provided is accurate and
+                    complete.
+                  </label>
+                </div>
+              </div>
             </div>
-            <div className="form-group">
-             <label>Reporting Period</label>
-              <MonthSelector
-                value={form.reporting_period}
-                onChange={(value) =>
-                  updateField("reporting_period", value)
-                }
-              /> 
+
+            <div className="info-box">
+              <Info size={22} />
+              <p>
+                If no funds were received this month, submit the report with zero
+                amounts. It will be recorded as <b>No Funds Received</b>, not
+                non-compliant.
+              </p>
             </div>
-            <div className="form-group">
-              <label>Procurement Source</label>
-              
-              <select
-                value={form.procurement_source}
-                onChange={(e) =>
-                  updateField("procurement_source", e.target.value)
-                }
-                required
+
+            <div className="form-actions split">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setStep(1)}
               >
-                <option value="">Select procurement source</option>
-                <option value="KEMSA">KEMSA</option>
-                <option value="MEDS">MEDS</option>
-                <option value="Other">Other</option>
-              </select>
+                <ArrowLeft size={18} /> Back
+              </button>
+
+              <button
+                type="submit"
+                className="submit-btn"
+                disabled={submitting}
+              >
+                {submitting ? "Submitting..." : "Submit"}
+                <Send size={18} />
+              </button>
             </div>
-            <div className="form-group">
-              <label>Date Received</label>
-
-              <input
-                type="date"
-                value={form.date_received}
-                onChange={(e) =>
-                  updateField("date_received", e.target.value)
-                }
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amount Allocated to HPT</label>
-
-              <input
-                type="text"
-                value={form.amount_allocated_to_hpt}
-                onChange={(e) =>
-                  updateField(
-                    "amount_allocated_to_hpt",
-                    formatNumber(e.target.value)
-                  )
-                }
-                placeholder="Enter HPT allocation"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amount Spent on HPT</label>
-
-              <input
-                type="text"
-                value={form.amount_spent_on_hpt}
-                onChange={(e) =>
-                  updateField(
-                    "amount_spent_on_hpt",
-                    formatNumber(e.target.value)
-                  )
-                }
-                placeholder="Enter HPT spend"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amount Used for CHP Kits</label>
-
-              <input
-                type="text"
-                value={form.amount_used_for_chp_kits}
-                onChange={(e) =>
-                  updateField(
-                    "amount_used_for_chp_kits",
-                    formatNumber(e.target.value)
-                  )
-                }
-                placeholder="Enter CHP Kits amount"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Submitted By</label>
-
-              <input
-                type="text"
-                value={form.submitted_by}
-                onChange={(e) =>
-                  updateField("submitted_by", e.target.value)
-                }
-              />
-            </div>
-          </div>
-            
-         
-
-          <div className="section-title">
-            <FileText size={18} />
-            <span>Supporting Documents</span>
-          </div>
-
-          <label className="upload-box">
-            <Upload size={28} />
-
-            <span>
-              {document
-                ? document.name
-                : "Upload supporting document"}
-            </span>
-
-            <input
-              type="file"
-              hidden
-              onChange={(e) =>
-                setDocument(e.target.files?.[0] || null)
-              }
-            />
-          </label>
-
-          <button
-            type="submit"
-            className="submit-btn"
-            disabled={submitting}
-          >
-            {submitting ? "Submitting..." : "Submit Record"}
-          </button>
-        </form>
-
-       
-      </div>
+          </>
+        )}
+      </form>
     </div>
   );
 }

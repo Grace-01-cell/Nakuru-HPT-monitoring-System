@@ -40,12 +40,12 @@ function Register() {
   const filteredFacilities = facilities.filter(
     (f) => f.subcounty_name === form.subcounty_name
   );
+  const selectedFacility = facilities.find(
+  (f) => f.mfl_code === form.facility_mfl_code
+);
 
   async function handleRegister() {
-    const selectedFacility = facilities.find(
-      (f) => f.mfl_code === form.facility_mfl_code
-    );
-
+   
     const payload = {
       first_name: form.first_name,
       last_name: form.last_name,
@@ -183,12 +183,23 @@ function Register() {
                   >
                     <option value="">Select Facility</option>
                     {filteredFacilities.map((facility) => (
-                      <option key={facility.mfl_code} value={facility.mfl_code}>
-                        {facility.facility_name}
+                      <option key={facility.mfl_code} value={facility.mfl_code}>{facility.facility_name} - {facility.mfl_code}
                       </option>
                     ))}
                   </select>
                 </div>
+                {selectedFacility && (
+                  <div className="input-group">
+                    <Building2 size={22} />
+                    <input
+                      type="text"
+                      value={`MFL Code: ${selectedFacility.mfl_code}`}
+                      readOnly
+                    />
+
+                    
+                  </div>
+                )}
               </>
             )}
 

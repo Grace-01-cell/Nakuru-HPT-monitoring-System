@@ -52,7 +52,23 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
             "success": False,
             "message": "User already exists",
         }
-    approved = payload.role == "facility"  # Facility users are auto-approved, others require admin approval
+
+    # Prevent more than one account per facility
+    if payload.role == "facility" and payload.facility_mfl_code:
+        existing_facility_user = (
+            db.query(User)
+            .filter(User.facility_mfl_code == payload.facility_mfl_code)
+            .first()
+        )
+
+        if existing_facility_user:
+            return {
+                "success": False,
+                "message": "This facility already has a registered account. Please contact the system administrator.",
+            }
+
+    approved = payload.role == "facility"
+
     new_user = User(
         first_name=payload.first_name,
         last_name=payload.last_name,
@@ -64,7 +80,6 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         subcounty_name=payload.subcounty_name,
         is_active=True,
         is_approved=approved,
-        
     )
 
     db.add(new_user)
@@ -86,7 +101,6 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
             "is_active": new_user.is_active,
         },
     }
-
 
 @router.post("/login")
 def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
