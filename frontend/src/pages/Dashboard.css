@@ -283,3 +283,24 @@ td {
     grid-template-columns: 1fr;
   }
 }
+.dashboard-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboard-search label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.dashboard-search input {
+  min-width: 280px;
+  height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: white;
+  outline: none;
+}

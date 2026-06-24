@@ -46,6 +46,7 @@ interface FacilityCompliance {
   facility_name: string;
   subcounty_name: string;
   ward_name: string;
+  funding_source: string;
   amount_received: number;
   hpt_allocated: number;
   hpt_spent: number;
@@ -89,6 +90,21 @@ function KpiCard({
     </div>
   );
 }
+function parseReportingPeriod(period: string) {
+  const parts = String(period || "").split("-");
+
+  if (parts.length !== 2) {
+    return { month: "", year: "" };
+  }
+
+  const [first, second] = parts;
+
+  if (/^\d{4}$/.test(first)) {
+    return { year: first, month: second };
+  }
+
+  return { month: first, year: second };
+}
 
 function CountyDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -100,6 +116,10 @@ function CountyDashboard() {
   const [selectedFundingSource, setSelectedFundingSource] = useState(["All"]);
   const [fundingSourceTrend, setFundingSourceTrend] = useState([]);
   const [hptAllocationTrend, setHptAllocationTrend] = useState([]);
+  const [selectedWard, setSelectedWard] = useState(["All"]);
+  const [selectedFacility, setSelectedFacility] = useState(["All"]);
+  const [selectedYear, setSelectedYear] = useState(["All"]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fundingSourceChartData = Object.values(
   fundingSourceTrend.reduce((acc: any, item: any) => {
@@ -123,20 +143,21 @@ const hptAllocationChartData = hptAllocationTrend;
   setLoading(true);
 
   api.get(
-  `/dashboard/county?reporting_periods=${selectedMonth.join(",")}&subcounties=${selectedSubcounty.join(",")}&funding_sources=${selectedFundingSource.join(",")}`
+  `/dashboard/county?reporting_periods=All&subcounties=All&funding_sources=All`
 )
     .then((res) => {
       setSummary(res.data.summary);
-      setFacilities(res.data.facility_compliance);
+      setFacilities(res.data.facility_compliance || []);
       setFundingSourceTrend(res.data.funding_source_trend || []);
       setHptAllocationTrend(res.data.hpt_allocation_trend || []);
     })
+    
     .catch((err) => {
       console.error(err);
       alert("Failed to load dashboard data");
     })
     .finally(() => setLoading(false));
-}, [selectedMonth, selectedSubcounty, selectedFundingSource]);
+}, []);
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -146,22 +167,99 @@ const hptAllocationChartData = hptAllocationTrend;
     return <div>No dashboard data found.</div>;
   }
 
-  const subcounties = [
-    "All",
-    ...Array.from(
-      new Set(
-        facilities
-          .map((facility) => facility.subcounty_name)
-          .filter((name) => name && name.trim() !== "")
-      )
-    ),
-  ];
+ const subcounties = [
+  "All",
+  ...Array.from(
+    new Set(
+      facilities
+        .map((facility) => facility.subcounty_name)
+        .filter((name) => name && name.trim() !== "")
+    )
+  ).sort((a, b) => a.localeCompare(b)),
+];
 
+const wards = [
+  "All",
+  ...Array.from(
+    new Set(
+      facilities
+        .map((facility) => facility.ward_name)
+        .filter((name) => name && name.trim() !== "")
+    )
+  ).sort((a, b) => a.localeCompare(b)),
+];
+
+const facilityOptions = [
+  "All",
+  ...facilities
+    .map((facility) => `${facility.facility_name} - ${facility.mfl_code}`)
+    .sort((a, b) => a.localeCompare(b)),
+];
+
+const months = [
+  "All",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const currentYear = new Date().getFullYear();
+
+const years = [
+  "All",
+  ...Array.from(
+    { length: currentYear - 2026 + 6 },
+    (_, index) => String(2026 + index)
+  ),
+];
   const filteredFacilities = facilities.filter((facility) => {
-    return (
-      selectedSubcounty.includes("All") || selectedSubcounty.includes(facility.subcounty_name)
-    );
-  });
+  const facilityLabel = `${facility.facility_name} - ${facility.mfl_code}`;
+  const { month, year } = parseReportingPeriod(facility.reporting_period);
+
+  const search = searchTerm.toLowerCase();
+  
+  return (
+    (selectedSubcounty.includes("All") ||
+      selectedSubcounty.includes(facility.subcounty_name)) &&
+
+    (selectedWard.includes("All") ||
+      selectedWard.includes(facility.ward_name)) &&
+
+    (selectedFacility.includes("All") ||
+      selectedFacility.includes(facilityLabel)) &&
+
+    (selectedYear.includes("All") ||
+      selectedYear.includes(year)) &&
+
+    (selectedMonth.includes("All") ||
+      selectedMonth.includes(month)) &&
+
+    (selectedFundingSource.includes("All") ||
+      selectedFundingSource.some((source) =>
+        String(facility.funding_source || "")
+      .toLowerCase()
+      .includes(source.toLowerCase())
+
+      )) &&
+
+    (
+      search === "" ||
+      facility.facility_name?.toLowerCase().includes(search) ||
+      facility.subcounty_name?.toLowerCase().includes(search) ||
+      facility.ward_name?.toLowerCase().includes(search) ||
+      facility.mfl_code?.toLowerCase().includes(search)
+    )
+  );
+});
   const filteredSummary = {
     total_amount_received: filteredFacilities.reduce(
   (sum, facility) => sum + Number(facility.amount_received || 0),
@@ -307,23 +405,74 @@ const hptAllocationChartData = hptAllocationTrend;
   />
 
   <MultiCheckboxFilter
-    label="Reporting Period"
-    options={["Jan-2026", "Feb-2026", "Mar-2026", "Apr-2026", "May-2026"]}
+    label="Ward"
+    options={wards.filter((item) => item !== "All")}
+    selected={selectedWard}
+    onChange={(values) => {
+      setSelectedWard(values);
+      setPage(1);
+    }}
+  />
+
+  <MultiCheckboxFilter
+    label="Facility"
+    options={facilityOptions.filter((item) => item !== "All")}
+    selected={selectedFacility}
+    onChange={(values) => {
+      setSelectedFacility(values);
+      setPage(1);
+    }}
+  />
+
+  <MultiCheckboxFilter
+    label="Year"
+    options={years.filter((item) => item !== "All")}
+    selected={selectedYear}
+    onChange={(values) => {
+      setSelectedYear(values);
+      setPage(1);
+    }}
+  />
+
+  <MultiCheckboxFilter
+    label="Month"
+    options={months.filter((item) => item !== "All")}
     selected={selectedMonth}
-    onChange={setSelectedMonth}
+    onChange={(values) => {
+      setSelectedMonth(values);
+      setPage(1);
+    }}
   />
 
   <MultiCheckboxFilter
     label="Funding Source"
     options={[
+      "County Allocation",
       "FIF",
       "SHIF",
-      "Facility Collection (Out of Pocket)",
-      "Partner Funding",
+      "PHC",
+      "Partners",
+      "Donations",
     ]}
     selected={selectedFundingSource}
-    onChange={setSelectedFundingSource}
+    onChange={(values) => {
+      setSelectedFundingSource(values);
+      setPage(1);
+    }}
   />
+
+  <div className="dashboard-search">
+    <label>Search</label>
+    <input
+      type="text"
+      placeholder="Search facility, MFL, ward, subcounty"
+      value={searchTerm}
+      onChange={(e) => {
+        setSearchTerm(e.target.value);
+        setPage(1);
+      }}
+    />
+  </div>
 </div>
       <div className="kpi-grid">
         <KpiCard
@@ -487,7 +636,7 @@ const hptAllocationChartData = hptAllocationTrend;
           <Line type="monotone" dataKey="SHIF" stroke="#16a34a" />
           <Line
             type="monotone"
-            dataKey="Facility Collection (Out of Pocket)"
+            dataKey="PHC"
             stroke="#f97316"
           />
           <Line type="monotone" dataKey="Partner Funding" stroke="#7c3aed" />

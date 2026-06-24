@@ -17,6 +17,9 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = BASE_DIR / "uploads"
 
+FACILITY_FILE = DATA_DIR / "facility_master.xlsx"
+HPT_FILE = DATA_DIR / "hpt_records.xlsx"
+
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 app.add_middleware(
@@ -34,10 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-FACILITY_FILE = DATA_DIR / "facility_master.xlsx"
-HPT_FILE = DATA_DIR / "hpt_records.xlsx"
 
 REQUIRED_HPT_PERCENT = 40
 REQUIRED_CHP_KIT_PERCENT_OF_HPT = 5
@@ -339,6 +339,12 @@ def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", fu
         axis=1,
     )
     
+    if "funding_source" in df.columns:
+        facility_compliance["funding_source"] = df["funding_source"]
+    else:
+        facility_compliance["funding_source"] = ""
+
+    
     facility_compliance = facility_compliance.astype(object)
     funding_source_trend = (
     df.groupby(
@@ -372,7 +378,7 @@ def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", fu
         "funding_source_trend": funding_source_trend.fillna("").to_dict(orient="records"),
         "hpt_allocation_trend": hpt_allocation_trend.fillna("").to_dict(orient="records"),
     }
-    
+
 
 
 @app.get("/dashboard/facility/{mfl_code}")
