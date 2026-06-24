@@ -471,7 +471,7 @@ async def submit_record(
         "amount_allocated_to_hpt": amount_allocated_to_hpt,
         "amount_spent_on_hpt": amount_spent_on_hpt,
         "amount_used_for_chp_kits": amount_used_for_chp_kits,
-        "supporting_document": document_name,
+        "supporting_document": f"/uploads/{document_name}" if document_name else "",
         "submitted_by": submitted_by,
         "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
        

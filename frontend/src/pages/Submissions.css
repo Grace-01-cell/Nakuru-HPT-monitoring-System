@@ -178,3 +178,114 @@ tbody tr:nth-child(even) {
     gap: 12px;
   }
 }
+.submissions-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.view-doc-btn {
+  border: none;
+  cursor: pointer;
+}
+
+.view-doc-btn:hover {
+  background: #dbeafe;
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.pagination button {
+  background: #0644ad;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #0a57d6;
+}
+
+.pagination button:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.pagination span {
+  font-weight: 600;
+  color: #334155;
+}
+.pdf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 10px;
+}
+
+.pdf-modal {
+  width: 98vw;
+  height: 96vh;
+
+  background: white;
+  border-radius: 16px;
+
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+}
+
+.pdf-modal-header {
+  height: 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 20px;
+
+  background: #0644ad;
+  color: white;
+}
+
+.pdf-modal-header h3 {
+  margin: 0;
+}
+
+.pdf-modal-header button {
+  border: none;
+  background: white;
+  color: #0644ad;
+
+  padding: 8px 14px;
+  border-radius: 8px;
+
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pdf-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+}
