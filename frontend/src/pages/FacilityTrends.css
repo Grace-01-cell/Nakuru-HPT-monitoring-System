@@ -1,98 +1,159 @@
-.facility-coming-page {
-  width: 100%;
-  min-height: calc(100vh - 95px);
-  position: relative;
-  overflow: hidden;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 60px 20px;
-}
-
-.facility-bg-image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-
-  object-fit: cover;
-  object-position: center;
-
-  filter: blur(0.8px);
-  transform: scale(1.02);
-  z-index: 0;
-}
-
-.facility-bg-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.22);
-  z-index: 1;
-}
-
-.facility-coming-card {
-  position: relative;
-  z-index: 2;
-
-  width: 100%;
-  max-width: 1200px;
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 24px;
-  padding: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.18);
-}
-
-.facility-icon {
-  width: 74px;
-  height: 74px;
-  border-radius: 20px;
-  background: #eff6ff;
-  color: #2563eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-
-.facility-coming-card h1 {
-  margin: 0;
-  font-size: 34px;
+.facility-trends-page {
+  padding: 24px;
+  background: #f5f8fc;
+  min-height: 100vh;
   color: #0f172a;
-  font-weight: 700;
 }
 
-.coming-soon {
-  margin-top: 14px;
-  color: #0d7219;
-  font-size: 22px;
-  line-height: 1.7;
-}
-
-.future-features {
-  margin-top: 36px;
-  display: grid;
-  gap: 14px;
-}
-
-.feature-item {
-  background: rgba(248, 250, 252, 0.9);
-
-  border: 1px solid #e2e8f0;
-
-  padding: 44px 44px;
-
-  min-height: 85px;
-
-  border-radius: 26px;
-
-  color: #334155;
-
-  font-weight: 600;
-
+.facility-trends-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 22px;
+}
 
-  font-size: 20px;
+.facility-trends-header h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #0b2b66;
+}
+
+.facility-trends-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.facility-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.facility-kpi-card,
+.facility-chart-card,
+.facility-submissions-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.facility-kpi-card span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.facility-kpi-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.facility-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.facility-chart-card h3,
+.facility-submissions-card h3 {
+  margin: 0 0 16px;
+  color: #0f172a;
+}
+
+.facility-table-wrap {
+  overflow-x: auto;
+}
+
+.facility-table-wrap table {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.facility-table-wrap th {
+  text-align: left;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.facility-table-wrap td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.facility-table-wrap tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status.compliant {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.non-compliant {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.facility-doc-btn,
+.facility-replace-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.facility-doc-btn {
+  background: #eff6ff;
+  color: #0644ad;
+}
+
+.facility-replace-btn {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.facility-note {
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .facility-kpi-grid,
+  .facility-chart-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .facility-kpi-grid,
+  .facility-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .facility-trends-page {
+    padding: 14px;
+  }
 }

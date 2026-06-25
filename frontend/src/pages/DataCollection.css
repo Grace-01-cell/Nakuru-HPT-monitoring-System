@@ -106,16 +106,26 @@
   background: #ffffff;
 }
 
+
 .form-group {
+
   display: flex;
+
   flex-direction: column;
+
   gap: 6px;
+
 }
 
+
 .form-group label {
+
   font-size: 13px;
+
   font-weight: 700;
+
   color: #172b4d;
+
 }
 
 input,
@@ -430,11 +440,20 @@ select:focus {
   margin: 0;
 }
 
-.data-table td input[type="text"] {
-  width: 100%;
+.funding-layout .data-table td input[type="text"] {
+  width: 220px;
   max-width: 220px;
-  margin-left: auto;
+  margin-left: 0;
   display: block;
+  text-align: right;
+}
+.two-column-section .data-table td input[type="text"] {
+  width: 180px !important;
+  min-width: 180px !important;
+  max-width: 180px !important;
+  margin-left: 0 !important;
+  display: block;
+  text-align: right;
 }
 .funding-layout .data-table {
   table-layout: fixed;
@@ -442,12 +461,12 @@ select:focus {
 
 .funding-layout .data-table th:first-child,
 .funding-layout .data-table td:first-child {
-  width: 55%;
+  width: 35%;
 }
 
 .funding-layout .data-table th:nth-child(2),
 .funding-layout .data-table td:nth-child(2) {
-  width: 45%;
+  width: 65%;
 }
 
 
@@ -455,4 +474,8 @@ select:focus {
   width: 220px;
   max-width: 220px;
   text-align: right;
+}
+.hpt-category-breakdown input {
+  width: 180px !important;
+  min-width: 180px !important;
 }
