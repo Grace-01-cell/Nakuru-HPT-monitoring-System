@@ -1,0 +1,148 @@
+.sha-page {
+  padding: 24px;
+  background: #f5f8fc;
+  min-height: 100vh;
+  color: #0f172a;
+}
+
+.sha-header {
+  margin-bottom: 20px;
+}
+
+.sha-header h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #0b2b66;
+}
+
+.sha-header p {
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.sha-card {
+  background: white;
+  border: 1px solid #dbe5f1;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.sha-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 12px;
+  font-weight: 800;
+  color: #0b2b66;
+}
+
+.sha-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.sha-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sha-form-group.full {
+  margin-top: 16px;
+}
+
+.sha-form-group label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.sha-form-group input,
+.sha-form-group select,
+.sha-form-group textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: white;
+}
+
+.sha-form-group input,
+.sha-form-group select {
+  height: 44px;
+}
+
+.sha-form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.sha-upload-box {
+  min-height: 150px;
+  border: 2px dashed #b7c6d8;
+  border-radius: 16px;
+  background: #fbfdff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  color: #41607f;
+}
+
+.sha-upload-box:hover {
+  border-color: #2563eb;
+  background: #f2f7ff;
+}
+
+.sha-upload-box span {
+  font-weight: 800;
+}
+
+.sha-upload-box small {
+  color: #64748b;
+}
+
+.sha-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.sha-actions button {
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  padding: 0 20px;
+  font-weight: 800;
+  cursor: pointer;
+  background: #0644ad;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sha-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1000px) {
+  .sha-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .sha-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sha-page {
+    padding: 14px;
+  }
+}
