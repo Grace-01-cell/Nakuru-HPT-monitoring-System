@@ -11,7 +11,7 @@ from models import User
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="Nakuru HPT Monitoring API")
+app = FastAPI(title="Nakuru HPT - Financial Monitoring System API")
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -19,6 +19,9 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 
 FACILITY_FILE = DATA_DIR / "facility_master.xlsx"
 HPT_FILE = DATA_DIR / "hpt_records.xlsx"
+SHA_FILE = DATA_DIR / "county_sha_reports.xlsx"
+SHA_UPLOAD_DIR = UPLOAD_DIR / "sha_reports"
+SHA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -191,11 +194,37 @@ def get_joined_data() -> pd.DataFrame:
     df = records.merge(facilities, on="mfl_code", how="inner")
     return df
 
+def ensure_sha_file():
+    if not SHA_FILE.exists():
+        columns = [
+            "report_id",
+            "report_type",
+            "frequency",
+            "reporting_year",
+            "reporting_month",
+            "reporting_quarter",
+            "reporting_period",
+            "value",
+            "submitted_by",
+            "notes",
+            "supporting_document",
+            "submitted_at",
+        ]
+
+        pd.DataFrame(columns=columns).to_excel(SHA_FILE, index=False)
 
 @app.get("/")
 def home():
     return {"message": "Nakuru HPT Monitoring API is running"}
+@app.get("/county-sha-reports")
+def get_county_sha_reports():
+    ensure_sha_file()
 
+    df = pd.read_excel(SHA_FILE)
+    df = clean_columns(df)
+    df = df.astype(object)
+
+    return df.fillna("").to_dict(orient="records")
 
 @app.get("/health")
 def health():
@@ -430,7 +459,65 @@ def facility_dashboard(mfl_code: str):
         },
         "records": df.astype(object).fillna("").to_dict(orient="records"),
     }
+@app.post("/county-sha-reports")
+async def submit_county_sha_report(
+    report_type: str = Form(...),
+    reporting_year: str = Form(...),
+    reporting_month: str = Form(""),
+    reporting_quarter: str = Form(""),
+    value: float = Form(0),
+    submitted_by: str = Form("SHA Coordinator"),
+    notes: str = Form(""),
+    supporting_document: UploadFile | None = File(None),
+):
+    ensure_sha_file()
 
+    frequency = "Quarterly" if report_type == "SHA Contracted Facilities" else "Monthly"
+
+    reporting_period = (
+        f"{reporting_quarter}-{reporting_year}"
+        if frequency == "Quarterly"
+        else f"{reporting_month}-{reporting_year}"
+    )
+
+    document_path = ""
+
+    if supporting_document:
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        document_name = f"{timestamp}_{supporting_document.filename}"
+        file_path = SHA_UPLOAD_DIR / document_name
+
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(supporting_document.file, buffer)
+
+        document_path = f"/uploads/sha_reports/{document_name}"
+
+    df = pd.read_excel(SHA_FILE)
+    df = clean_columns(df)
+
+    new_record = {
+        "report_id": datetime.now().strftime("%Y%m%d%H%M%S"),
+        "report_type": report_type,
+        "frequency": frequency,
+        "reporting_year": reporting_year,
+        "reporting_month": reporting_month,
+        "reporting_quarter": reporting_quarter,
+        "reporting_period": reporting_period,
+        "value": value,
+        "submitted_by": submitted_by,
+        "notes": notes,
+        "supporting_document": document_path,
+        "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    updated_df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
+    updated_df.to_excel(SHA_FILE, index=False)
+
+    return {
+        "success": True,
+        "message": "SHA report submitted successfully",
+        "record": new_record,
+    }
 
 @app.post("/submit-record")
 async def submit_record(
@@ -483,4 +570,49 @@ async def submit_record(
     return {
         "message": "Record submitted successfully",
         "record": new_record,
+    }
+@app.post("/records/replace-document")
+def replace_supporting_document(
+    mfl_code: str = Form(...),
+    reporting_period: str = Form(...),
+    supporting_document: UploadFile = File(...),
+):
+    df = pd.read_excel(HPT_FILE)
+    df = clean_columns(df)
+
+    if "supporting_document" not in df.columns:
+        df["supporting_document"] = ""
+
+    mask = (
+        (df["mfl_code"].astype(str) == str(mfl_code))
+        & (df["reporting_period"].astype(str) == str(reporting_period))
+    )
+
+    if not mask.any():
+        return {
+            "success": False,
+            "message": "Submission record not found.",
+        }
+
+    if supporting_document.content_type != "application/pdf":
+        return {
+            "success": False,
+            "message": "Only PDF files are allowed.",
+        }
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    document_name = f"{timestamp}_{supporting_document.filename}"
+    file_path = UPLOAD_DIR / document_name
+
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(supporting_document.file, buffer)
+
+    df.loc[mask, "supporting_document"] = f"/uploads/{document_name}"
+
+    df.to_excel(HPT_FILE, index=False)
+
+    return {
+        "success": True,
+        "message": "Supporting document replaced successfully.",
+        "supporting_document": f"/uploads/{document_name}",
     }

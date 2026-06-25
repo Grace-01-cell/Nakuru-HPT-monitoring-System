@@ -6,6 +6,7 @@ import {
   Building2,
   Settings,
   LogOut,
+  BarChart3,
   Users,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -37,7 +38,10 @@ if (role === "county") {
   menuItems.push(
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { label: "Submissions", path: "/submissions", icon: FileText },
+    { label: "County SHA Reporting", path: "/county-sha-reporting", icon: BarChart3 },
+    { label: "SHA Performance", path: "/sha-performance", icon: BarChart3 },
     { label: "Facility Trends", path: "/facilities", icon: Building2 }
+    
   );
 }
 
@@ -48,8 +52,11 @@ if (role === "admin") {
     { label: "Data Collection", path: "/data-collection", icon: ClipboardList },
     { label: "Submissions", path: "/submissions", icon: FileText },
     { label: "Facility Trends", path: "/facilities", icon: Building2 },
+    { label: "County SHA Reporting", path: "/county-sha-reporting", icon: BarChart3 },
+    { label: "SHA Performance", path: "/sha-performance", icon: BarChart3 },
     { label: "User Management", path: "/admin/users", icon: Users },
     { label: "Settings", path: "/settings", icon: Settings }
+    
   );
 }
 
@@ -67,7 +74,8 @@ if (role === "admin") {
         <img src="/assets/nakuru-logo.png" alt="Nakuru County" />
         <div>
           <h2>Nakuru County</h2>
-          <p>HPT Monitoring</p>
+          <p>HPT - FIMS
+Financial Monitoring System</p>
         </div>
       </div>
 

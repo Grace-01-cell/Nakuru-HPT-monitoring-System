@@ -8,6 +8,8 @@ import Register from "./pages/Register";
 import AdminUsers from "./pages/AdminUsers";
 
 import CountyDashboard from "./pages/CountyDashboard";
+import CountySHAReporting from "./pages/CountySHAReporting";
+import SHAPerformance from "./pages/SHAPerformance";
 
 
 function Placeholder({ title }: { title: string }) {
@@ -38,7 +40,11 @@ function App() {
           <Route path="/users" element={<Placeholder title="Users" />} />
           <Route path="/settings" element={<Placeholder title="Settings" />} />
           <Route path="/facilities" element={<FacilityTrends />} />
+          <Route path="/county-sha-reporting" element={<CountySHAReporting />} />
+          <Route path="/sha-performance" element={<SHAPerformance />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          
+          
         </Route>
       </Routes>
     </BrowserRouter>

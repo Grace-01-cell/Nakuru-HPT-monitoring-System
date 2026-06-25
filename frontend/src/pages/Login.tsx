@@ -44,8 +44,8 @@ function Login() {
       <div className="login-overlay">
         <header className="login-header">
           <img src="/assets/nakuru-logo.png" alt="Nakuru County Logo" className="county-logo" />
-          <h1>NAKURU HPT</h1>
-          <h2>MONITORING SYSTEM</h2>
+          <h1>NAKURU COUNTY</h1>
+          <h2>HPT - Financial Monitoring System</h2>
           <p>Healthy People, Prosperous County</p>
         </header>
 

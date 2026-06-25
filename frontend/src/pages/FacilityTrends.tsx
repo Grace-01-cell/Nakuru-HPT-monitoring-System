@@ -73,6 +73,32 @@ function FacilityTrends() {
     const documentPath = path.startsWith("/") ? path : `/${path}`;
     window.open(`${baseUrl}${documentPath}`, "_blank");
   }
+  async function replaceDocument(
+  mflCode: string,
+  reportingPeriod: string,
+  file: File
+) {
+  if (file.type !== "application/pdf") {
+    alert("Please upload a PDF file only.");
+    return;
+  }
+
+  const data = new FormData();
+  data.append("mfl_code", mflCode);
+  data.append("reporting_period", reportingPeriod);
+  data.append("supporting_document", file);
+
+  try {
+    await api.post("/records/replace-document", data);
+    alert("Supporting document replaced successfully.");
+
+    const res = await api.get("/records");
+    setRecords(res.data || []);
+  } catch (error) {
+    console.error(error);
+    alert("Failed to replace supporting document.");
+  }
+}
 
   if (loading) {
     return <div className="facility-trends-page">Loading facility trends...</div>;
@@ -221,12 +247,22 @@ function FacilityTrends() {
                       "—"
                     )}
                   </td>
-                  <td>
-                    <button type="button" className="facility-replace-btn" disabled>
-                      <Upload size={15} />
-                      Replace Document
-                    </button>
-                  </td>
+                  <label className="facility-replace-btn">
+                    <Upload size={15} />
+                    Replace Document
+                    <input
+                    type="file"
+                    accept="application/pdf"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        replaceDocument(record.mfl_code, record.reporting_period, file);
+                      }
+                    }}
+                    />
+                    </label>
+
                 </tr>
               ))}
 
@@ -239,9 +275,7 @@ function FacilityTrends() {
           </table>
         </div>
 
-        <p className="facility-note">
-          Document replacement will be enabled once the correction endpoint is added.
-        </p>
+
       </div>
     </div>
   );

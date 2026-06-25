@@ -83,7 +83,7 @@ function Register() {
         <main className="login-content">
           <section className="login-card">
             <h3>Create Account</h3>
-            <p className="subtitle">Register for Nakuru HPT Monitoring System</p>
+            <p className="subtitle">Register for Nakuru HPT - Financial Monitoring System</p>
 
             <div className="input-group">
               <User size={22} />
