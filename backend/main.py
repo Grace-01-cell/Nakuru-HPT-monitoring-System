@@ -308,21 +308,26 @@ def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", fu
         "chp_kits_compliant_facilities": int(chp_compliant),
         "chp_kits_below_target_facilities": int(chp_below_target),
     }
-
     facility_compliance = (
-        df.groupby(
-            ["mfl_code", "facility_name", "subcounty_name", "ward_name"],
-            dropna=False,
-        )
-        .agg(
-            amount_received=("amount_received", "sum"),
-            hpt_allocated=("amount_allocated_to_hpt", "sum"),
-            hpt_spent=("amount_spent_on_hpt", "sum"),
-            amount_used_for_chp_kits=("amount_used_for_chp_kits", "sum"),
-            reporting_period=("reporting_period", "first"),
-        )
-        .reset_index()
+    df.groupby(
+        [
+            "mfl_code",
+            "facility_name",
+            "subcounty_name",
+            "ward_name",
+            "reporting_period",
+            "funding_source",
+        ],
+        dropna=False,
     )
+    .agg(
+        amount_received=("amount_received", "sum"),
+        hpt_allocated=("amount_allocated_to_hpt", "sum"),
+        hpt_spent=("amount_spent_on_hpt", "sum"),
+        amount_used_for_chp_kits=("amount_used_for_chp_kits", "sum"),
+    )
+    .reset_index()
+)
 
     facility_compliance["balance"] = (
         facility_compliance["hpt_allocated"] - facility_compliance["hpt_spent"]

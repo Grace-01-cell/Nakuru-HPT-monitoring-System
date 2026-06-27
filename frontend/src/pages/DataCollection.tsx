@@ -244,10 +244,28 @@ function DataCollection() {
               .map((item) => `${item.source}: ${cleanNumber(item.amount)}`)
               .join("; ")
       );
-      data.append(
-        "reporting_period",
-        `${form.reporting_year}-${form.reporting_month}`
-      );
+      const monthMap: Record<string, string> = {
+  January: "Jan",
+  February: "Feb",
+  March: "Mar",
+  April: "Apr",
+  May: "May",
+  June: "Jun",
+  July: "Jul",
+  August: "Aug",
+  September: "Sep",
+  October: "Oct",
+  November: "Nov",
+  December: "Dec",
+};
+
+const shortMonth =
+  monthMap[form.reporting_month] || form.reporting_month;
+
+data.append(
+  "reporting_period",
+  `${shortMonth}-${form.reporting_year}`
+);
       data.append("procurement_source", procurement.join(", "));
       data.append("date_received", form.date_received);
       data.append("amount_allocated_to_hpt", String(totalAllocatedToHpt));

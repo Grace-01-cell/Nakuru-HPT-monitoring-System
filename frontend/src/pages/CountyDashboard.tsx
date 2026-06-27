@@ -114,28 +114,14 @@ function CountyDashboard() {
   const [selectedSubcounty, setSelectedSubcounty] = useState(["All"]);
   const [selectedMonth, setSelectedMonth] = useState(["All"]);
   const [selectedFundingSource, setSelectedFundingSource] = useState(["All"]);
-  const [fundingSourceTrend, setFundingSourceTrend] = useState([]);
-  const [hptAllocationTrend, setHptAllocationTrend] = useState([]);
   const [selectedWard, setSelectedWard] = useState(["All"]);
   const [selectedFacility, setSelectedFacility] = useState(["All"]);
   const [selectedYear, setSelectedYear] = useState(["All"]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fundingSourceChartData = Object.values(
-  fundingSourceTrend.reduce((acc: any, item: any) => {
-    const period = item.reporting_period;
+ 
 
-    if (!acc[period]) {
-      acc[period] = { reporting_period: period };
-    }
 
-    acc[period][item.funding_source] = item.amount_received;
-
-    return acc;
-  }, {})
-);
-
-const hptAllocationChartData = hptAllocationTrend;
 
   const rowsPerPage = 10;
 
@@ -148,8 +134,7 @@ const hptAllocationChartData = hptAllocationTrend;
     .then((res) => {
       setSummary(res.data.summary);
       setFacilities(res.data.facility_compliance || []);
-      setFundingSourceTrend(res.data.funding_source_trend || []);
-      setHptAllocationTrend(res.data.hpt_allocation_trend || []);
+     
     })
     
     .catch((err) => {
@@ -198,18 +183,18 @@ const facilityOptions = [
 
 const months = [
   "All",
-  "January",
-  "February",
-  "March",
-  "April",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
   "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 const currentYear = new Date().getFullYear();
@@ -226,40 +211,104 @@ const years = [
   const { month, year } = parseReportingPeriod(facility.reporting_period);
 
   const search = searchTerm.toLowerCase();
-  
+
   return (
     (selectedSubcounty.includes("All") ||
       selectedSubcounty.includes(facility.subcounty_name)) &&
-
     (selectedWard.includes("All") ||
       selectedWard.includes(facility.ward_name)) &&
-
     (selectedFacility.includes("All") ||
       selectedFacility.includes(facilityLabel)) &&
-
     (selectedYear.includes("All") ||
       selectedYear.includes(year)) &&
-
     (selectedMonth.includes("All") ||
       selectedMonth.includes(month)) &&
-
     (selectedFundingSource.includes("All") ||
       selectedFundingSource.some((source) =>
         String(facility.funding_source || "")
-      .toLowerCase()
-      .includes(source.toLowerCase())
-
+          .toLowerCase()
+          .includes(source.toLowerCase())
       )) &&
-
-    (
-      search === "" ||
+    (search === "" ||
       facility.facility_name?.toLowerCase().includes(search) ||
       facility.subcounty_name?.toLowerCase().includes(search) ||
       facility.ward_name?.toLowerCase().includes(search) ||
-      facility.mfl_code?.toLowerCase().includes(search)
-    )
+      facility.mfl_code?.toLowerCase().includes(search))
   );
 });
+
+const monthOrder: Record<string, number> = {
+  Jan: 1,
+  Feb: 2,
+  Mar: 3,
+  Apr: 4,
+  May: 5,
+  Jun: 6,
+  Jul: 7,
+  Aug: 8,
+  Sep: 9,
+  Oct: 10,
+  Nov: 11,
+  Dec: 12,
+};
+
+const fundingSourceChartData = Object.values(
+  filteredFacilities.reduce((acc: any, facility: any) => {
+    const { month, year } = parseReportingPeriod(facility.reporting_period);
+    const period = month && year ? `${month}-${year}` : "Unknown";
+    const sourceText = String(facility.funding_source || "");
+
+    if (!acc[period]) {
+      acc[period] = { reporting_period: period };
+    }
+
+    ["County Allocation", "FIF", "SHIF", "PHC", "Partners", "Donations"].forEach(
+      (source) => {
+        if (sourceText.toLowerCase().includes(source.toLowerCase())) {
+          acc[period][source] =
+            (acc[period][source] || 0) + Number(facility.amount_received || 0);
+        }
+      }
+    );
+
+    return acc;
+  }, {})
+).sort((a: any, b: any) => {
+  const [m1, y1] = a.reporting_period.split("-");
+  const [m2, y2] = b.reporting_period.split("-");
+
+  return Number(y1) - Number(y2) || monthOrder[m1] - monthOrder[m2];
+});
+
+const hptAllocationChartData = Object.values(
+  filteredFacilities.reduce((acc: any, facility: any) => {
+    const { month, year } = parseReportingPeriod(facility.reporting_period);
+    const period = month && year ? `${month}-${year}` : "Unknown";
+
+    if (!acc[period]) {
+      acc[period] = {
+        reporting_period: period,
+        amount_received: 0,
+        hpt_allocated: 0,
+        hpt_spent: 0,
+        chp_kits_used: 0,
+      };
+    }
+
+    acc[period].amount_received += Number(facility.amount_received || 0);
+    acc[period].hpt_allocated += Number(facility.hpt_allocated || 0);
+    acc[period].hpt_spent += Number(facility.hpt_spent || 0);
+    acc[period].chp_kits_used += Number(facility.amount_used_for_chp_kits || 0);
+
+    return acc;
+  }, {})
+).sort((a: any, b: any) => {
+  const [m1, y1] = a.reporting_period.split("-");
+  const [m2, y2] = b.reporting_period.split("-");
+
+  return Number(y1) - Number(y2) || monthOrder[m1] - monthOrder[m2];
+});
+
   const filteredSummary = {
     total_amount_received: filteredFacilities.reduce(
   (sum, facility) => sum + Number(facility.amount_received || 0),
@@ -632,14 +681,12 @@ const years = [
 
           <Legend />
 
-          <Line type="monotone" dataKey="FIF" stroke="#2563eb" />
-          <Line type="monotone" dataKey="SHIF" stroke="#16a34a" />
-          <Line
-            type="monotone"
-            dataKey="PHC"
-            stroke="#f97316"
-          />
-          <Line type="monotone" dataKey="Partner Funding" stroke="#7c3aed" />
+          <Line type="monotone" dataKey="County Allocation" stroke="#2563eb" />
+          <Line type="monotone" dataKey="FIF" stroke="#16a34a" />
+          <Line type="monotone" dataKey="SHIF" stroke="#f97316" />
+          <Line type="monotone" dataKey="PHC" stroke="#7c3aed" />
+          <Line type="monotone" dataKey="Partners" stroke="#0f766e" />
+          <Line type="monotone" dataKey="Donations" stroke="#dc2626" />
         </LineChart>
       </ResponsiveContainer>
     </div>
