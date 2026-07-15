@@ -3,7 +3,7 @@ import {
   Wallet,
   Download,
   Package,
-  ClipboardCheck,
+  
   Percent,
   ShieldCheck,
 } from "lucide-react";
@@ -163,22 +163,45 @@ function CountyDashboard() {
   ).sort((a, b) => a.localeCompare(b)),
 ];
 
+const facilitiesBySubcounty = facilities.filter(
+  (facility) =>
+    selectedSubcounty.includes("All") ||
+    selectedSubcounty.length === 0 ||
+    selectedSubcounty.includes(facility.subcounty_name)
+);
+
 const wards = [
   "All",
   ...Array.from(
     new Set(
-      facilities
+      facilitiesBySubcounty
         .map((facility) => facility.ward_name)
         .filter((name) => name && name.trim() !== "")
     )
   ).sort((a, b) => a.localeCompare(b)),
 ];
 
+const facilitiesByWard = facilitiesBySubcounty.filter(
+  (facility) =>
+    selectedWard.includes("All") ||
+    selectedWard.length === 0 ||
+    selectedWard.includes(facility.ward_name)
+);
+
 const facilityOptions = [
   "All",
-  ...facilities
-    .map((facility) => `${facility.facility_name} - ${facility.mfl_code}`)
-    .sort((a, b) => a.localeCompare(b)),
+  ...Array.from(
+    new Set(
+      facilitiesByWard
+        .map(
+          (facility) =>
+            `${facility.facility_name} - ${String(
+              facility.mfl_code
+            ).replace(/\.0$/, "")}`
+        )
+        .filter((name) => name && name.trim() !== "")
+    )
+  ).sort((a, b) => a.localeCompare(b)),
 ];
 
 const months = [
@@ -206,37 +229,40 @@ const years = [
     (_, index) => String(2026 + index)
   ),
 ];
-  const filteredFacilities = facilities.filter((facility) => {
-  const facilityLabel = `${facility.facility_name} - ${facility.mfl_code}`;
-  const { month, year } = parseReportingPeriod(facility.reporting_period);
+  console.log("Current selectedSubcounty:", selectedSubcounty);
+  const activeSubcounties = selectedSubcounty.filter(
+  (item) => item !== "All"
+);
+ 
 
-  const search = searchTerm.toLowerCase();
+const activeWards = selectedWard.filter(
+  (item) => item !== "All"
+);
 
-  return (
-    (selectedSubcounty.includes("All") ||
-      selectedSubcounty.includes(facility.subcounty_name)) &&
-    (selectedWard.includes("All") ||
-      selectedWard.includes(facility.ward_name)) &&
-    (selectedFacility.includes("All") ||
-      selectedFacility.includes(facilityLabel)) &&
-    (selectedYear.includes("All") ||
-      selectedYear.includes(year)) &&
-    (selectedMonth.includes("All") ||
-      selectedMonth.includes(month)) &&
-    (selectedFundingSource.includes("All") ||
-      selectedFundingSource.some((source) =>
-        String(facility.funding_source || "")
-          .toLowerCase()
-          .includes(source.toLowerCase())
-      )) &&
-    (search === "" ||
-      facility.facility_name?.toLowerCase().includes(search) ||
-      facility.subcounty_name?.toLowerCase().includes(search) ||
-      facility.ward_name?.toLowerCase().includes(search) ||
-      facility.mfl_code?.toLowerCase().includes(search))
-  );
+const activeFacilities = selectedFacility.filter(
+  (item) => item !== "All"
+);
+
+const filteredFacilities = facilities.filter((facility) => {
+  const mflCode = String(facility.mfl_code ?? "").replace(/\.0$/, "");
+
+  const facilityLabel = `${facility.facility_name} - ${mflCode}`;
+
+  const matchesSubcounty =
+    activeSubcounties.length === 0 ||
+    activeSubcounties.includes(facility.subcounty_name);
+
+  const matchesWard =
+    activeWards.length === 0 ||
+    activeWards.includes(facility.ward_name);
+
+  const matchesFacility =
+    activeFacilities.length === 0 ||
+    activeFacilities.includes(facilityLabel);
+
+  return matchesSubcounty && matchesWard && matchesFacility;
 });
-
+ 
 const monthOrder: Record<string, number> = {
   Jan: 1,
   Feb: 2,
@@ -398,23 +424,20 @@ const hptAllocationChartData = Object.values(
       "HPT %",
       "HPT Status",
       "CHP Kits Amount",
-      "CHP Kits %",
-      "CHP Kits Status",
+
     ];
 
     const rows = filteredFacilities.map((facility) => [
-      facility.facility_name,
-      facility.subcounty_name,
-      facility.ward_name,
-      facility.amount_received,
-      facility.hpt_allocated,
-      facility.hpt_spent,
-      facility.hpt_percent,
-      facility.compliance_status,
-      facility.amount_used_for_chp_kits,
-      facility.chp_kits_percent_of_hpt,
-      facility.chp_kits_status,
-    ]);
+  facility.facility_name,
+  facility.subcounty_name,
+  facility.ward_name,
+  facility.amount_received,
+  facility.hpt_allocated,
+  facility.hpt_spent,
+  facility.hpt_percent,
+  facility.compliance_status,
+  facility.amount_used_for_chp_kits,
+]);
 
     const csv = [headers, ...rows]
       .map((row) =>
@@ -439,7 +462,7 @@ const hptAllocationChartData = Object.values(
     <div className="dashboard-page">
       <div className="dashboard-heading">
         <h2>County Dashboard</h2>
-        <p>Facility-level HPT and CHP Kits compliance visibility.</p>
+        <p>Facility-level HPT compliance visibility.</p>
       </div>
 
       <div className="dashboard-filters">
@@ -448,6 +471,7 @@ const hptAllocationChartData = Object.values(
     options={subcounties.filter((item) => item !== "All")}
     selected={selectedSubcounty}
     onChange={(values) => {
+      console.log("Selected Subcounty:", values);
       setSelectedSubcounty(values);
       setPage(1);
     }}
@@ -463,15 +487,15 @@ const hptAllocationChartData = Object.values(
     }}
   />
 
-  <MultiCheckboxFilter
-    label="Facility"
-    options={facilityOptions.filter((item) => item !== "All")}
-    selected={selectedFacility}
-    onChange={(values) => {
-      setSelectedFacility(values);
-      setPage(1);
-    }}
-  />
+ <MultiCheckboxFilter
+  label="Facility"
+  options={facilityOptions.filter((item) => item !== "All")}
+  selected={selectedFacility}
+  onChange={(values) => {
+    setSelectedFacility(values);
+    setPage(1);
+  }}
+/>
 
   <MultiCheckboxFilter
     label="Year"
@@ -552,12 +576,7 @@ const hptAllocationChartData = Object.values(
           icon={Package}
         />
 
-        <KpiCard
-          title="CHP Kits Compliance"
-          value={`${filteredSummary.chp_kits_compliant_facilities}/${filteredFacilities.length}`}
-          subtitle="Facilities meeting CHP Kits target"
-          icon={ClipboardCheck}
-        />
+
       </div>
 
       <div className="dashboard-analysis-grid">
@@ -609,53 +628,7 @@ const hptAllocationChartData = Object.values(
       </div>
     </div>
 
-    <div className="chart-card">
-      <h3>CHP Kits Compliance Status</h3>
-
-      <div className="compliance-bars">
-        <div className="compliance-row">
-          <div>
-            <strong>Compliant</strong>
-            <span>Facilities meeting 5% of HPT target</span>
-          </div>
-          <b>{filteredSummary.chp_kits_compliant_facilities}</b>
-        </div>
-
-        <div className="bar-track">
-          <div
-            className="bar-fill green"
-            style={{
-              width: `${
-                (filteredSummary.chp_kits_compliant_facilities /
-                  submittedFacilities) *
-                100
-              }%`,
-            }}
-          />
-        </div>
-
-        <div className="compliance-row">
-          <div>
-            <strong>Below Target</strong>
-            <span>Facilities below CHP Kits requirement</span>
-          </div>
-          <b>{filteredSummary.chp_kits_below_target_facilities}</b>
-        </div>
-
-        <div className="bar-track">
-          <div
-            className="bar-fill red"
-            style={{
-              width: `${
-                (filteredSummary.chp_kits_below_target_facilities /
-                  submittedFacilities) *
-                100
-              }%`,
-            }}
-          />
-        </div>
-      </div>
-    </div>
+    
   </div>
 
   <div className="trend-stack">
@@ -758,8 +731,7 @@ const hptAllocationChartData = Object.values(
                 <th>HPT %</th>
                 <th>HPT Status</th>
                 <th>CHP Kits Amount</th>
-                <th>CHP Kits %</th>
-                <th>CHP Status</th>
+
               </tr>
             </thead>
 
@@ -781,18 +753,7 @@ const hptAllocationChartData = Object.values(
                     </span>
                   </td>
                   <td>{money(facility.amount_used_for_chp_kits)}</td>
-                  <td>{facility.chp_kits_percent_of_hpt}%</td>
-                  <td>
-                    <span
-                      className={
-                        facility.chp_kits_status === "Compliant"
-                          ? "status compliant"
-                          : "status non-compliant"
-                      }
-                    >
-                      {facility.chp_kits_status}
-                    </span>
-                  </td>
+
                 </tr>
               ))}
             </tbody>

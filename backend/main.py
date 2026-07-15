@@ -1,4 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel
+from typing import Literal
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from datetime import datetime
@@ -11,6 +13,14 @@ from models import User
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
 
+class ReviewRecordRequest(BaseModel):
+    record_id: int | str | None = None
+    mfl_code: str
+    reporting_period: str
+    review_status: Literal["Accepted", "Rejected"]
+    review_reason: str = ""
+    reviewed_by: str = "county_reviewer"
+    
 app = FastAPI(title="Nakuru HPT - Financial Monitoring System API")
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -122,13 +132,23 @@ def load_hpt_records() -> pd.DataFrame:
         "submitted_by",
         "submission_date",
         "reporting_period",
+
+        # County review fields
+        "review_status",
+        "review_reason",
+        "reviewed_by",
+        "reviewed_at",
     ]
 
     for col in needed:
         if col not in df.columns:
             df[col] = ""
 
-    df["mfl_code"] = df["mfl_code"].astype(str).str.strip()
+    df["mfl_code"] = (
+        df["mfl_code"]
+        .astype(str)
+        .str.strip()
+    )
 
     money_cols = [
         "amount_received",
@@ -138,13 +158,45 @@ def load_hpt_records() -> pd.DataFrame:
     ]
 
     for col in money_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce",
+        ).fillna(0)
 
-    df["balance"] = df["amount_allocated_to_hpt"] - df["amount_spent_on_hpt"]
+    # Clean review fields for old and new records
+    review_text_columns = [
+        "review_status",
+        "review_reason",
+        "reviewed_by",
+        "reviewed_at",
+    ]
+
+    for col in review_text_columns:
+        df[col] = (
+            df[col]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+    # Existing records that have never been reviewed become Pending
+    df.loc[
+        df["review_status"] == "",
+        "review_status",
+    ] = "Pending"
+
+    df["balance"] = (
+        df["amount_allocated_to_hpt"]
+        - df["amount_spent_on_hpt"]
+    )
 
     df["hpt_percent"] = df.apply(
         lambda row: round(
-            (row["amount_allocated_to_hpt"] / row["amount_received"]) * 100,
+            (
+                row["amount_allocated_to_hpt"]
+                / row["amount_received"]
+            )
+            * 100,
             2,
         )
         if row["amount_received"] > 0
@@ -155,14 +207,26 @@ def load_hpt_records() -> pd.DataFrame:
     df["required_hpt_percent"] = REQUIRED_HPT_PERCENT
 
     df["compliance_status"] = df["hpt_percent"].apply(
-        lambda x: "Compliant" if x >= REQUIRED_HPT_PERCENT else "Non-Compliant"
+        lambda value: (
+            "Compliant"
+            if value >= REQUIRED_HPT_PERCENT
+            else "Non-Compliant"
+        )
     )
 
-    df["required_chp_kits_amount"] = df["amount_allocated_to_hpt"] * 0.05
+    # CHP calculations remain available in the backend,
+    # although the CHP columns will no longer appear in the table.
+    df["required_chp_kits_amount"] = (
+        df["amount_allocated_to_hpt"] * 0.05
+    )
 
     df["chp_kits_percent_of_hpt"] = df.apply(
         lambda row: round(
-            (row["amount_used_for_chp_kits"] / row["amount_allocated_to_hpt"]) * 100,
+            (
+                row["amount_used_for_chp_kits"]
+                / row["amount_allocated_to_hpt"]
+            )
+            * 100,
             2,
         )
         if row["amount_allocated_to_hpt"] > 0
@@ -170,29 +234,89 @@ def load_hpt_records() -> pd.DataFrame:
         axis=1,
     )
 
-    df["required_chp_kits_percent_of_hpt"] = REQUIRED_CHP_KIT_PERCENT_OF_HPT
+    df["required_chp_kits_percent_of_hpt"] = (
+        REQUIRED_CHP_KIT_PERCENT_OF_HPT
+    )
 
     df["chp_kits_status"] = df.apply(
         lambda row: (
             "Compliant"
-            if row["amount_used_for_chp_kits"] >= row["required_chp_kits_amount"]
+            if row["amount_used_for_chp_kits"]
+            >= row["required_chp_kits_amount"]
             else "Below Target"
         ),
         axis=1,
     )
-    df["reporting_period_sort"] = pd.to_datetime(
-        df["reporting_period"], errors="coerce"
-    )
-    return df
 
+    df["reporting_period_sort"] = pd.to_datetime(
+        df["reporting_period"],
+        errors="coerce",
+    )
+
+    return df
+def normalize_mfl_code(value) -> str:
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+
+    if text.lower() in {"", "nan", "none"}:
+        return ""
+
+    if text.endswith(".0"):
+        text = text[:-2]
+
+    return text
 
 
 def get_joined_data() -> pd.DataFrame:
-    facilities = load_facilities()
-    records = load_hpt_records()
+    facilities = load_facilities().copy()
+    records = load_hpt_records().copy()
 
-    df = records.merge(facilities, on="mfl_code", how="inner")
-    return df
+    facilities["mfl_code"] = facilities["mfl_code"].apply(
+        normalize_mfl_code
+    )
+
+    records["mfl_code"] = records["mfl_code"].apply(
+        normalize_mfl_code
+    )
+
+    # Exclude rows without valid MFL codes.
+    facilities = facilities[
+        facilities["mfl_code"] != ""
+    ].copy()
+
+    records = records[
+        records["mfl_code"] != ""
+    ].copy()
+
+    # One valid MFL code must belong to only one facility.
+    duplicate_facilities = facilities[
+        facilities.duplicated(
+            subset=["mfl_code"],
+            keep=False,
+        )
+    ]
+
+    if not duplicate_facilities.empty:
+        duplicate_codes = sorted(
+            duplicate_facilities["mfl_code"]
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+
+        raise ValueError(
+            "Duplicate valid MFL codes found in facility master: "
+            + ", ".join(duplicate_codes)
+        )
+
+    return records.merge(
+        facilities,
+        on="mfl_code",
+        how="inner",
+        validate="many_to_one",
+    )
 
 def ensure_sha_file():
     if not SHA_FILE.exists():
@@ -501,20 +625,31 @@ async def submit_county_sha_report(
     df = clean_columns(df)
 
     new_record = {
-        "report_id": datetime.now().strftime("%Y%m%d%H%M%S"),
-        "report_type": report_type,
-        "frequency": frequency,
-        "reporting_year": reporting_year,
-        "reporting_month": reporting_month,
-        "reporting_quarter": reporting_quarter,
-        "reporting_period": reporting_period,
-        "value": value,
-        "submitted_by": submitted_by,
-        "notes": notes,
-        "supporting_document": document_path,
-        "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
+    "mfl_code": mfl_code,
+    "amount_received": amount_received,
+    "funding_source": funding_source,
+    "reporting_period": reporting_period,
+    "procurement_source": procurement_source,
+    "date_received": date_received,
+    "amount_allocated_to_hpt": amount_allocated_to_hpt,
+    "amount_spent_on_hpt": amount_spent_on_hpt,
+    "amount_used_for_chp_kits": amount_used_for_chp_kits,
+    "supporting_document": (
+        f"/uploads/{document_name}"
+        if document_name
+        else ""
+    ),
+    "submitted_by": submitted_by,
+    "submission_date": datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    ),
 
+    # Every new submission starts as Pending
+    "review_status": "Pending",
+    "review_reason": "",
+    "reviewed_by": "",
+    "reviewed_at": "",
+}
     updated_df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
     updated_df.to_excel(SHA_FILE, index=False)
 
@@ -575,6 +710,162 @@ async def submit_record(
     return {
         "message": "Record submitted successfully",
         "record": new_record,
+    }
+@app.patch("/records/review")
+def review_submission(payload: ReviewRecordRequest):
+    review_reason = payload.review_reason.strip()
+
+    if (
+        payload.review_status == "Rejected"
+        and not review_reason
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="A rejection reason is required.",
+        )
+
+    try:
+        df = pd.read_excel(HPT_FILE)
+        df = clean_columns(df)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="The HPT records file was not found.",
+        )
+
+    review_columns = [
+        "review_status",
+        "review_reason",
+        "reviewed_by",
+        "reviewed_at",
+    ]
+
+    for col in review_columns:
+        if col not in df.columns:
+            df[col] = ""
+
+    if "mfl_code" not in df.columns:
+        raise HTTPException(
+            status_code=500,
+            detail="The HPT records file has no MFL code column.",
+        )
+
+    if "reporting_period" not in df.columns:
+        raise HTTPException(
+            status_code=500,
+            detail="The HPT records file has no reporting period column.",
+        )
+
+    def normalise_mfl(value) -> str:
+        text = str(value).strip()
+
+        # Excel sometimes reads codes such as 14275 as 14275.0
+        if text.endswith(".0"):
+            text = text[:-2]
+
+        return text
+
+    requested_mfl = normalise_mfl(payload.mfl_code)
+    requested_period = str(
+        payload.reporting_period
+    ).strip()
+
+    mfl_values = df["mfl_code"].apply(normalise_mfl)
+
+    reporting_period_values = (
+        df["reporting_period"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    mask = (
+        (mfl_values == requested_mfl)
+        & (
+            reporting_period_values
+            == requested_period
+        )
+    )
+
+    matching_indexes = df.index[mask].tolist()
+
+    if not matching_indexes:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "The submission could not be found for "
+                f"MFL {payload.mfl_code} and reporting period "
+                f"{payload.reporting_period}."
+            ),
+        )
+
+    # Where duplicates exist, update the latest matching record.
+    target_index = matching_indexes[-1]
+
+    reviewed_at = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    saved_reason = (
+        review_reason
+        if payload.review_status == "Rejected"
+        else ""
+    )
+
+    df.at[
+        target_index,
+        "review_status",
+    ] = payload.review_status
+
+    df.at[
+        target_index,
+        "review_reason",
+    ] = saved_reason
+
+    df.at[
+        target_index,
+        "reviewed_by",
+    ] = payload.reviewed_by.strip() or "county_reviewer"
+
+    df.at[
+        target_index,
+        "reviewed_at",
+    ] = reviewed_at
+
+    try:
+        df.to_excel(HPT_FILE, index=False)
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The HPT Excel file is open. Close the file "
+                "and try again."
+            ),
+        )
+
+    return {
+        "success": True,
+        "message": (
+            f"Submission {payload.review_status.lower()} successfully."
+        ),
+        "review_status": payload.review_status,
+        "review_reason": saved_reason,
+        "reviewed_by": (
+            payload.reviewed_by.strip()
+            or "county_reviewer"
+        ),
+        "reviewed_at": reviewed_at,
+        "record": {
+            "mfl_code": payload.mfl_code,
+            "reporting_period": payload.reporting_period,
+            "review_status": payload.review_status,
+            "review_reason": saved_reason,
+            "reviewed_by": (
+                payload.reviewed_by.strip()
+                or "county_reviewer"
+            ),
+            "reviewed_at": reviewed_at,
+        },
     }
 @app.post("/records/replace-document")
 def replace_supporting_document(
