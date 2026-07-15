@@ -41,7 +41,7 @@ const fundingSources = [
   "SHIF",
   "PHC",
   "Partners",
-  "Donations",
+  "Monetary Donations",
 ];
 
 const procurementSources = ["KEMSA", "MEDS", "Prequalified Suppliers"];
@@ -62,6 +62,7 @@ function DataCollection() {
   const [step, setStep] = useState(1);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [document, setDocument] = useState<File | null>(null);
+ 
   const [submitting, setSubmitting] = useState(false);
   const currentYear = new Date().getFullYear();
 
@@ -77,14 +78,15 @@ function DataCollection() {
     submitter_designation: "",
     declaration: false,
   });
-
+  
   const [funding, setFunding] = useState(
-    fundingSources.map((source) => ({
-      source,
-      selected: false,
-      amount: "",
-    }))
-  );
+  fundingSources.map((source) => ({
+    source,
+    selected: false,
+    amount: "",
+    detail: "",
+  }))
+);
 
   const [procurement, setProcurement] = useState<string[]>([]);
 
@@ -141,7 +143,7 @@ function DataCollection() {
   }, [categories, form.no_funds_received]);
 
   const requiredHptAllocation = totalFunding * 0.4;
-  const requiredChpKits = requiredHptAllocation * 0.05;
+ 
   const hptPercent =
     totalFunding > 0 ? (totalAllocatedToHpt / totalFunding) * 100 : 0;
 
@@ -216,17 +218,30 @@ function DataCollection() {
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!form.declaration) {
-      alert("Please confirm the declaration before submitting.");
-      return;
-    }
+  const amountReceived = funding.reduce(
+  (total, item) =>
+    total + (item.selected ? Number(cleanNumber(item.amount)) : 0),
+  0
+);
 
-    if (!form.no_funds_received && !form.date_received) {
-      alert("Please select the date received.");
-      return;
-    }
+  if (amountReceived > 0 && !document) {
+    alert(
+      "A supporting document is required when the amount received is greater than zero."
+    );
+    return;
+  }
+
+  if (!form.declaration) {
+    alert("Please confirm the declaration before submitting.");
+    return;
+  }
+
+  if (!form.no_funds_received && !form.date_received) {
+    alert("Please select the date received.");
+    return;
+  }
 
     try {
       setSubmitting(true);
@@ -319,8 +334,7 @@ data.append(
                 <strong>HPT Funding Requirements</strong>
                 <p>
                   At least <b>40%</b> of the Approved/Allocated Amount should be
-                  allocated to HPT. At least <b>5%</b> of the HPT allocation
-                  should be used for CHP Kits.
+                  allocated to HPT. 
                 </p>
               </div>
             </div>
@@ -461,6 +475,27 @@ data.append(
                           />
                           {item.source}
                         </label>
+                          {item.selected &&
+                          (item.source === "Monetary Donations" ||
+                            item.source === "Partners") && (
+                            <input
+                            type="text"
+                            className="funding-detail-input"
+                            placeholder={item.source === "Monetary Donations"
+                              ? "Enter donor name"
+                              : "Enter partner name"
+                            }
+                            value={item.detail}
+                            disabled={form.no_funds_received}
+                            onChange={(e) => {
+                              const updatedFunding = [...funding];
+                              updatedFunding[index].detail = e.target.value;
+                              setFunding(updatedFunding);
+                            }}
+                            required
+                          /> 
+                        )}
+            
                       </td>
                       <td>
                         <input
@@ -474,6 +509,7 @@ data.append(
                       </td>
                     </tr>
                   ))}
+                  
                   <tr className="total-row">
                     <td>Total Funding</td>
                     <td>{money(totalFunding)}</td>
@@ -490,10 +526,7 @@ data.append(
                   <span>Required HPT Allocation (40%)</span>
                   <strong>{money(requiredHptAllocation)}</strong>
                 </div>
-                <div>
-                  <span>Required CHP Kits Amount (5% of HPT)</span>
-                  <strong>{money(requiredChpKits)}</strong>
-                </div>
+
               </div>
             </div>
 
