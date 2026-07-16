@@ -9,9 +9,11 @@ import shutil
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from database import Base, engine, get_db
-from models import User
+from models import SupportingDocument, User
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
+# Create any database tables that do not already exist.
+Base.metadata.create_all(bind=engine)
 
 class ReviewRecordRequest(BaseModel):
     record_id: int | str | None = None
