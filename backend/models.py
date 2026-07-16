@@ -2,9 +2,12 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
+    ForeignKey,
     Integer,
     LargeBinary,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.sql import func
 
@@ -70,4 +73,116 @@ class SupportingDocument(Base):
     uploaded_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
+    )
+class HPTRecord(Base):
+    __tablename__ = "hpt_records"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mfl_code",
+            "reporting_period",
+            name="uq_hpt_facility_reporting_period",
+        ),
+    )
+
+    record_id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    mfl_code = Column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+
+    reporting_period = Column(
+        String(20),
+        nullable=False,
+        index=True,
+    )
+
+    amount_received = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    funding_source = Column(
+        String(255),
+        nullable=False,
+    )
+
+    procurement_source = Column(
+        String(255),
+        nullable=True,
+    )
+
+    date_received = Column(
+        String(50),
+        nullable=False,
+    )
+
+    amount_allocated_to_hpt = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    amount_spent_on_hpt = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    amount_used_for_chp_kits = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    supporting_document_id = Column(
+        Integer,
+        ForeignKey(
+            "supporting_documents.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+
+    submitted_by = Column(
+        String(255),
+        nullable=True,
+    )
+
+    submitter_phone = Column(
+        String(50),
+        nullable=True,
+    )
+
+    submission_date = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    review_status = Column(
+        String(50),
+        nullable=False,
+        default="Pending",
+    )
+
+    review_reason = Column(
+        String(1000),
+        nullable=True,
+    )
+
+    reviewed_by = Column(
+        String(255),
+        nullable=True,
+    )
+
+    reviewed_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
     )

@@ -9,7 +9,7 @@ import shutil
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from database import Base, engine, get_db
-from models import SupportingDocument, User
+from models import HPTRecord, SupportingDocument, User
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
@@ -120,11 +120,51 @@ def load_facilities() -> pd.DataFrame:
     return df[needed]
 
 
-def load_hpt_records() -> pd.DataFrame:
-    df = pd.read_excel(HPT_FILE)
-    df = clean_columns(df)
+def format_database_datetime(value) -> str:
+    if not value:
+        return ""
 
-    needed = [
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def parse_reporting_period_sort(value):
+    text = str(value or "").strip()
+
+    if not text:
+        return pd.NaT
+
+    accepted_formats = [
+        "%Y-%m",
+        "%Y-%m-%d",
+        "%B %Y",
+        "%b %Y",
+    ]
+
+    for date_format in accepted_formats:
+        parsed = pd.to_datetime(
+            text,
+            format=date_format,
+            errors="coerce",
+        )
+
+        if not pd.isna(parsed):
+            return parsed
+
+    return pd.NaT
+
+
+def load_hpt_records(db: Session) -> pd.DataFrame:
+    records = (
+        db.query(HPTRecord)
+        .order_by(
+            HPTRecord.submission_date.asc(),
+            HPTRecord.record_id.asc(),
+        )
+        .all()
+    )
+
+    columns = [
+        "record_id",
         "mfl_code",
         "amount_received",
         "funding_source",
@@ -133,58 +173,106 @@ def load_hpt_records() -> pd.DataFrame:
         "amount_allocated_to_hpt",
         "amount_spent_on_hpt",
         "amount_used_for_chp_kits",
+        "supporting_document_id",
         "supporting_document",
         "submitted_by",
+        "submitter_phone",
         "submission_date",
         "reporting_period",
-
-        # County review fields
         "review_status",
         "review_reason",
         "reviewed_by",
         "reviewed_at",
     ]
 
-    for col in needed:
-        if col not in df.columns:
-            df[col] = ""
+    data = []
+
+    for record in records:
+        document_url = (
+            f"/documents/{record.supporting_document_id}"
+            if record.supporting_document_id
+            else ""
+        )
+
+        data.append(
+            {
+                "record_id": record.record_id,
+                "mfl_code": record.mfl_code,
+                "amount_received": record.amount_received or 0,
+                "funding_source": record.funding_source or "",
+                "procurement_source": (
+                    record.procurement_source or ""
+                ),
+                "date_received": record.date_received or "",
+                "amount_allocated_to_hpt": (
+                    record.amount_allocated_to_hpt or 0
+                ),
+                "amount_spent_on_hpt": (
+                    record.amount_spent_on_hpt or 0
+                ),
+                "amount_used_for_chp_kits": (
+                    record.amount_used_for_chp_kits or 0
+                ),
+                "supporting_document_id": (
+                    record.supporting_document_id or ""
+                ),
+                "supporting_document": document_url,
+                "submitted_by": record.submitted_by or "",
+                "submitter_phone": record.submitter_phone or "",
+                "submission_date": format_database_datetime(
+                    record.submission_date
+                ),
+                "reporting_period": (
+                    record.reporting_period or ""
+                ),
+                "review_status": (
+                    record.review_status or "Pending"
+                ),
+                "review_reason": record.review_reason or "",
+                "reviewed_by": record.reviewed_by or "",
+                "reviewed_at": format_database_datetime(
+                    record.reviewed_at
+                ),
+            }
+        )
+
+    df = pd.DataFrame(data, columns=columns)
 
     df["mfl_code"] = (
         df["mfl_code"]
+        .fillna("")
         .astype(str)
         .str.strip()
     )
 
-    money_cols = [
+    money_columns = [
         "amount_received",
         "amount_allocated_to_hpt",
         "amount_spent_on_hpt",
         "amount_used_for_chp_kits",
     ]
 
-    for col in money_cols:
-        df[col] = pd.to_numeric(
-            df[col],
+    for column in money_columns:
+        df[column] = pd.to_numeric(
+            df[column],
             errors="coerce",
         ).fillna(0)
 
-    # Clean review fields for old and new records
-    review_text_columns = [
+    review_columns = [
         "review_status",
         "review_reason",
         "reviewed_by",
         "reviewed_at",
     ]
 
-    for col in review_text_columns:
-        df[col] = (
-            df[col]
+    for column in review_columns:
+        df[column] = (
+            df[column]
             .fillna("")
             .astype(str)
             .str.strip()
         )
 
-    # Existing records that have never been reviewed become Pending
     df.loc[
         df["review_status"] == "",
         "review_status",
@@ -219,10 +307,12 @@ def load_hpt_records() -> pd.DataFrame:
         )
     )
 
-    # CHP calculations remain available in the backend,
-    # although the CHP columns will no longer appear in the table.
     df["required_chp_kits_amount"] = (
-        df["amount_allocated_to_hpt"] * 0.05
+        df["amount_allocated_to_hpt"]
+        * (
+            REQUIRED_CHP_KIT_PERCENT_OF_HPT
+            / 100
+        )
     )
 
     df["chp_kits_percent_of_hpt"] = df.apply(
@@ -253,12 +343,13 @@ def load_hpt_records() -> pd.DataFrame:
         axis=1,
     )
 
-    df["reporting_period_sort"] = pd.to_datetime(
-        df["reporting_period"],
-        errors="coerce",
-    )
+    df["reporting_period_sort"] = df[
+        "reporting_period"
+    ].apply(parse_reporting_period_sort)
 
     return df
+
+
 def normalize_mfl_code(value) -> str:
     if pd.isna(value):
         return ""
@@ -274,19 +365,20 @@ def normalize_mfl_code(value) -> str:
     return text
 
 
-def get_joined_data() -> pd.DataFrame:
+def get_joined_data(
+    db: Session,
+) -> pd.DataFrame:
     facilities = load_facilities().copy()
-    records = load_hpt_records().copy()
+    records = load_hpt_records(db).copy()
 
-    facilities["mfl_code"] = facilities["mfl_code"].apply(
-        normalize_mfl_code
-    )
+    facilities["mfl_code"] = facilities[
+        "mfl_code"
+    ].apply(normalize_mfl_code)
 
-    records["mfl_code"] = records["mfl_code"].apply(
-        normalize_mfl_code
-    )
+    records["mfl_code"] = records[
+        "mfl_code"
+    ].apply(normalize_mfl_code)
 
-    # Exclude rows without valid MFL codes.
     facilities = facilities[
         facilities["mfl_code"] != ""
     ].copy()
@@ -295,7 +387,6 @@ def get_joined_data() -> pd.DataFrame:
         records["mfl_code"] != ""
     ].copy()
 
-    # One valid MFL code must belong to only one facility.
     duplicate_facilities = facilities[
         facilities.duplicated(
             subset=["mfl_code"],
@@ -312,7 +403,8 @@ def get_joined_data() -> pd.DataFrame:
         )
 
         raise ValueError(
-            "Duplicate valid MFL codes found in facility master: "
+            "Duplicate valid MFL codes found in "
+            "facility master: "
             + ", ".join(duplicate_codes)
         )
 
@@ -322,26 +414,6 @@ def get_joined_data() -> pd.DataFrame:
         how="inner",
         validate="many_to_one",
     )
-
-def ensure_sha_file():
-    if not SHA_FILE.exists():
-        columns = [
-            "report_id",
-            "report_type",
-            "frequency",
-            "reporting_year",
-            "reporting_month",
-            "reporting_quarter",
-            "reporting_period",
-            "value",
-            "submitted_by",
-            "notes",
-            "supporting_document",
-            "submitted_at",
-        ]
-
-        pd.DataFrame(columns=columns).to_excel(SHA_FILE, index=False)
-
 @app.get("/")
 def home():
     return {"message": "Nakuru HPT Monitoring API is running"}
@@ -368,15 +440,25 @@ def facilities():
 
 
 @app.get("/records")
-def records():
-    df = get_joined_data()
+def records(
+    db: Session = Depends(get_db),
+):
+    df = get_joined_data(db)
     df = df.astype(object)
-    return df.fillna("").to_dict(orient="records")
+
+    return df.fillna("").to_dict(
+        orient="records"
+    )
 
 
 @app.get("/dashboard/county")
-def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", funding_sources: str = "All",):
-    df = get_joined_data()
+def county_dashboard(
+    reporting_periods: str = "All",
+    subcounties: str = "All",
+    funding_sources: str = "All",
+    db: Session = Depends(get_db),
+):
+    df = get_joined_data(db)
 
     if reporting_periods != "All":
         selected_periods = reporting_periods.split(",")
@@ -502,10 +584,7 @@ def county_dashboard(reporting_periods: str = "All",subcounties: str = "All", fu
         axis=1,
     )
     
-    if "funding_source" in df.columns:
-        facility_compliance["funding_source"] = df["funding_source"]
-    else:
-        facility_compliance["funding_source"] = ""
+
 
     
     facility_compliance = facility_compliance.astype(object)
@@ -663,31 +742,78 @@ async def submit_county_sha_report(
         "message": "SHA report submitted successfully",
         "record": new_record,
     }
-
 @app.post("/submit-record")
 async def submit_record(
     mfl_code: str = Form(...),
     amount_received: float = Form(...),
     funding_source: str = Form(...),
-    reporting_period: str = Form(""),
+    reporting_period: str = Form(...),
     procurement_source: str = Form(""),
     date_received: str = Form(...),
     amount_allocated_to_hpt: float = Form(...),
     amount_spent_on_hpt: float = Form(...),
     amount_used_for_chp_kits: float = Form(0),
     submitted_by: str = Form("facility_user"),
+    submitter_phone: str = Form(""),
     supporting_document: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
-    document_url = ""
-    document_id = None
+    normalized_mfl = normalize_mfl_code(
+        mfl_code
+    )
+
+    normalized_period = str(
+        reporting_period
+    ).strip()
+
+    if not normalized_mfl:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid MFL code is required.",
+        )
+
+    if not normalized_period:
+        raise HTTPException(
+            status_code=400,
+            detail="Reporting period is required.",
+        )
+
+    existing_record = (
+        db.query(HPTRecord)
+        .filter(
+            HPTRecord.mfl_code == normalized_mfl,
+            HPTRecord.reporting_period
+            == normalized_period,
+        )
+        .first()
+    )
+
+    if existing_record:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This facility has already submitted "
+                "a record for the selected reporting "
+                "period."
+            ),
+        )
 
     try:
-        if supporting_document:
-            if supporting_document.content_type != "application/pdf":
+        supporting_document_id = None
+
+        if (
+            supporting_document
+            and supporting_document.filename
+        ):
+            if (
+                supporting_document.content_type
+                != "application/pdf"
+            ):
                 raise HTTPException(
                     status_code=400,
-                    detail="Only PDF documents are allowed.",
+                    detail=(
+                        "Only PDF documents are allowed."
+                    ),
                 )
 
             file_bytes = await supporting_document.read()
@@ -701,7 +827,9 @@ async def submit_record(
             if len(file_bytes) > MAX_DOCUMENT_SIZE:
                 raise HTTPException(
                     status_code=400,
-                    detail="The PDF must not exceed 10 MB.",
+                    detail=(
+                        "The PDF must not exceed 10 MB."
+                    ),
                 )
 
             document = SupportingDocument(
@@ -721,65 +849,106 @@ async def submit_record(
             db.add(document)
             db.flush()
 
-            document_id = document.id
-            document_url = f"/documents/{document.id}"
+            supporting_document_id = document.id
 
-        old_df = pd.read_excel(HPT_FILE)
-        old_df = clean_columns(old_df)
-
-        new_record = {
-            "mfl_code": mfl_code,
-            "amount_received": amount_received,
-            "funding_source": funding_source,
-            "reporting_period": reporting_period,
-            "procurement_source": procurement_source,
-            "date_received": date_received,
-            "amount_allocated_to_hpt": amount_allocated_to_hpt,
-            "amount_spent_on_hpt": amount_spent_on_hpt,
-            "amount_used_for_chp_kits": amount_used_for_chp_kits,
-            "supporting_document": document_url,
-            "submitted_by": submitted_by,
-            "submission_date": datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
+        record = HPTRecord(
+            mfl_code=normalized_mfl,
+            reporting_period=normalized_period,
+            amount_received=amount_received,
+            funding_source=funding_source.strip(),
+            procurement_source=(
+                procurement_source.strip()
             ),
-        }
-
-        updated_df = pd.concat(
-            [old_df, pd.DataFrame([new_record])],
-            ignore_index=True,
+            date_received=date_received.strip(),
+            amount_allocated_to_hpt=(
+                amount_allocated_to_hpt
+            ),
+            amount_spent_on_hpt=(
+                amount_spent_on_hpt
+            ),
+            amount_used_for_chp_kits=(
+                amount_used_for_chp_kits
+            ),
+            supporting_document_id=(
+                supporting_document_id
+            ),
+            submitted_by=submitted_by.strip(),
+            submitter_phone=(
+                submitter_phone.strip()
+            ),
+            review_status="Pending",
         )
 
-        updated_df.to_excel(HPT_FILE, index=False)
-
+        db.add(record)
         db.commit()
+        db.refresh(record)
+
+        document_url = (
+            f"/documents/{supporting_document_id}"
+            if supporting_document_id
+            else ""
+        )
 
         return {
-            "message": "Record submitted successfully",
-            "document_id": document_id,
-            "record": new_record,
+            "message": (
+                "Record submitted successfully"
+            ),
+            "record": {
+                "record_id": record.record_id,
+                "mfl_code": record.mfl_code,
+                "reporting_period": (
+                    record.reporting_period
+                ),
+                "amount_received": (
+                    record.amount_received
+                ),
+                "funding_source": (
+                    record.funding_source
+                ),
+                "procurement_source": (
+                    record.procurement_source or ""
+                ),
+                "date_received": (
+                    record.date_received
+                ),
+                "amount_allocated_to_hpt": (
+                    record.amount_allocated_to_hpt
+                ),
+                "amount_spent_on_hpt": (
+                    record.amount_spent_on_hpt
+                ),
+                "amount_used_for_chp_kits": (
+                    record.amount_used_for_chp_kits
+                ),
+                "supporting_document": (
+                    document_url
+                ),
+                "submitted_by": (
+                    record.submitted_by or ""
+                ),
+                "submitter_phone": (
+                    record.submitter_phone or ""
+                ),
+                "review_status": (
+                    record.review_status
+                ),
+            },
         }
 
     except HTTPException:
         db.rollback()
         raise
 
-    except PermissionError:
-        db.rollback()
-
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The HPT Excel file is open. Close it and try again."
-            ),
-        )
-
     except Exception as exc:
         db.rollback()
 
         raise HTTPException(
             status_code=500,
-            detail="The submission could not be saved.",
+            detail=(
+                "The submission could not be saved."
+            ),
         ) from exc
+    
 @app.get("/documents/{document_id}")
 def view_supporting_document(
     document_id: int,
@@ -804,7 +973,10 @@ def view_supporting_document(
 
     return Response(
         content=document.file_data,
-        media_type=document.content_type or "application/pdf",
+        media_type=(
+            document.content_type
+            or "application/pdf"
+        ),
         headers={
             "Content-Disposition": (
                 f'inline; filename="{safe_filename}"'
@@ -812,7 +984,10 @@ def view_supporting_document(
         },
     )
 @app.patch("/records/review")
-def review_submission(payload: ReviewRecordRequest):
+def review_submission(
+    payload: ReviewRecordRequest,
+    db: Session = Depends(get_db),
+):
     review_reason = payload.review_reason.strip()
 
     if (
@@ -824,72 +999,25 @@ def review_submission(payload: ReviewRecordRequest):
             detail="A rejection reason is required.",
         )
 
-    try:
-        df = pd.read_excel(HPT_FILE)
-        df = clean_columns(df)
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="The HPT records file was not found.",
-        )
+    normalized_mfl = normalize_mfl_code(
+        payload.mfl_code
+    )
 
-    review_columns = [
-        "review_status",
-        "review_reason",
-        "reviewed_by",
-        "reviewed_at",
-    ]
-
-    for col in review_columns:
-        if col not in df.columns:
-            df[col] = ""
-
-    if "mfl_code" not in df.columns:
-        raise HTTPException(
-            status_code=500,
-            detail="The HPT records file has no MFL code column.",
-        )
-
-    if "reporting_period" not in df.columns:
-        raise HTTPException(
-            status_code=500,
-            detail="The HPT records file has no reporting period column.",
-        )
-
-    def normalise_mfl(value) -> str:
-        text = str(value).strip()
-
-        # Excel sometimes reads codes such as 14275 as 14275.0
-        if text.endswith(".0"):
-            text = text[:-2]
-
-        return text
-
-    requested_mfl = normalise_mfl(payload.mfl_code)
-    requested_period = str(
+    normalized_period = str(
         payload.reporting_period
     ).strip()
 
-    mfl_values = df["mfl_code"].apply(normalise_mfl)
-
-    reporting_period_values = (
-        df["reporting_period"]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-    )
-
-    mask = (
-        (mfl_values == requested_mfl)
-        & (
-            reporting_period_values
-            == requested_period
+    record = (
+        db.query(HPTRecord)
+        .filter(
+            HPTRecord.mfl_code == normalized_mfl,
+            HPTRecord.reporting_period == normalized_period,
         )
+        .order_by(HPTRecord.record_id.desc())
+        .first()
     )
 
-    matching_indexes = df.index[mask].tolist()
-
-    if not matching_indexes:
+    if not record:
         raise HTTPException(
             status_code=404,
             detail=(
@@ -899,74 +1027,61 @@ def review_submission(payload: ReviewRecordRequest):
             ),
         )
 
-    # Where duplicates exist, update the latest matching record.
-    target_index = matching_indexes[-1]
-
-    reviewed_at = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
     saved_reason = (
         review_reason
         if payload.review_status == "Rejected"
         else ""
     )
 
-    df.at[
-        target_index,
-        "review_status",
-    ] = payload.review_status
+    reviewed_by = (
+        payload.reviewed_by.strip()
+        or "county_reviewer"
+    )
 
-    df.at[
-        target_index,
-        "review_reason",
-    ] = saved_reason
+    reviewed_at = datetime.now()
 
-    df.at[
-        target_index,
-        "reviewed_by",
-    ] = payload.reviewed_by.strip() or "county_reviewer"
-
-    df.at[
-        target_index,
-        "reviewed_at",
-    ] = reviewed_at
+    record.review_status = payload.review_status
+    record.review_reason = saved_reason
+    record.reviewed_by = reviewed_by
+    record.reviewed_at = reviewed_at
 
     try:
-        df.to_excel(HPT_FILE, index=False)
-    except PermissionError:
+        db.commit()
+        db.refresh(record)
+
+    except Exception as exc:
+        db.rollback()
+
         raise HTTPException(
-            status_code=409,
-            detail=(
-                "The HPT Excel file is open. Close the file "
-                "and try again."
-            ),
-        )
+            status_code=500,
+            detail="The review could not be saved.",
+        ) from exc
 
     return {
         "success": True,
         "message": (
-            f"Submission {payload.review_status.lower()} successfully."
+            f"Submission "
+            f"{payload.review_status.lower()} successfully."
         ),
-        "review_status": payload.review_status,
-        "review_reason": saved_reason,
-        "reviewed_by": (
-            payload.reviewed_by.strip()
-            or "county_reviewer"
+        "review_status": record.review_status,
+        "review_reason": record.review_reason or "",
+        "reviewed_by": record.reviewed_by or "",
+        "reviewed_at": format_database_datetime(
+            record.reviewed_at
         ),
-        "reviewed_at": reviewed_at,
         "record": {
-            "mfl_code": payload.mfl_code,
-            "reporting_period": payload.reporting_period,
-            "review_status": payload.review_status,
-            "review_reason": saved_reason,
-            "reviewed_by": (
-                payload.reviewed_by.strip()
-                or "county_reviewer"
+            "record_id": record.record_id,
+            "mfl_code": record.mfl_code,
+            "reporting_period": record.reporting_period,
+            "review_status": record.review_status,
+            "review_reason": record.review_reason or "",
+            "reviewed_by": record.reviewed_by or "",
+            "reviewed_at": format_database_datetime(
+                record.reviewed_at
             ),
-            "reviewed_at": reviewed_at,
         },
     }
+
 @app.post("/records/replace-document")
 async def replace_supporting_document(
     mfl_code: str = Form(...),
@@ -974,7 +1089,10 @@ async def replace_supporting_document(
     supporting_document: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    if supporting_document.content_type != "application/pdf":
+    if (
+        supporting_document.content_type
+        != "application/pdf"
+    ):
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are allowed.",
@@ -994,48 +1112,32 @@ async def replace_supporting_document(
             detail="The PDF must not exceed 10 MB.",
         )
 
+    normalized_mfl = normalize_mfl_code(
+        mfl_code
+    )
+
+    normalized_period = str(
+        reporting_period
+    ).strip()
+
+    record = (
+        db.query(HPTRecord)
+        .filter(
+            HPTRecord.mfl_code == normalized_mfl,
+            HPTRecord.reporting_period
+            == normalized_period,
+        )
+        .order_by(HPTRecord.record_id.desc())
+        .first()
+    )
+
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail="Submission record not found.",
+        )
+
     try:
-        df = pd.read_excel(HPT_FILE)
-        df = clean_columns(df)
-
-        if "supporting_document" not in df.columns:
-            df["supporting_document"] = ""
-
-        def normalize_mfl_code(value) -> str:
-            text = str(value).strip()
-
-            if text.endswith(".0"):
-                text = text[:-2]
-
-            return text
-
-        requested_mfl = normalize_mfl_code(mfl_code)
-        requested_period = str(reporting_period).strip()
-
-        mfl_values = df["mfl_code"].apply(
-            normalize_mfl_code
-        )
-
-        period_values = (
-            df["reporting_period"]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-        )
-
-        mask = (
-            (mfl_values == requested_mfl)
-            & (period_values == requested_period)
-        )
-
-        matching_indexes = df.index[mask].tolist()
-
-        if not matching_indexes:
-            raise HTTPException(
-                status_code=404,
-                detail="Submission record not found.",
-            )
-
         document = SupportingDocument(
             original_filename=(
                 supporting_document.filename
@@ -1053,46 +1155,37 @@ async def replace_supporting_document(
         db.add(document)
         db.flush()
 
-        document_url = f"/documents/{document.id}"
-
-        target_index = matching_indexes[-1]
-
-        df.at[
-            target_index,
-            "supporting_document",
-        ] = document_url
-
-        df.to_excel(HPT_FILE, index=False)
+        record.supporting_document_id = document.id
+        record.review_status = "Resubmitted"
+        record.review_reason = ""
+        record.reviewed_by = None
+        record.reviewed_at = None
 
         db.commit()
+        db.refresh(record)
 
         return {
             "success": True,
             "message": (
-                "Supporting document replaced successfully."
+                "Supporting document replaced "
+                "successfully."
             ),
             "document_id": document.id,
-            "supporting_document": document_url,
-        }
-
-    except HTTPException:
-        db.rollback()
-        raise
-
-    except PermissionError:
-        db.rollback()
-
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The HPT Excel file is open. Close it and try again."
+            "supporting_document": (
+                f"/documents/{document.id}"
             ),
-        )
+            "review_status": (
+                record.review_status
+            ),
+        }
 
     except Exception as exc:
         db.rollback()
 
         raise HTTPException(
             status_code=500,
-            detail="The supporting document could not be replaced.",
+            detail=(
+                "The supporting document could "
+                "not be replaced."
+            ),
         ) from exc
