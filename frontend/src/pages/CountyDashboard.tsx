@@ -3,12 +3,10 @@ import {
   Wallet,
   Download,
   Package,
-  
   Percent,
   ShieldCheck,
 } from "lucide-react";
 import {
-  
   XAxis,
   YAxis,
   Tooltip,
@@ -21,7 +19,6 @@ import {
 import api from "../api/api";
 import "./Dashboard.css";
 import MultiCheckboxFilter from "../components/MultiCheckboxFilter";
-
 
 interface Summary {
   total_amount_received: number;
@@ -62,8 +59,129 @@ interface FacilityCompliance {
   reporting_period: string;
 }
 
+const FUNDING_SOURCE_OPTIONS = [
+  "County Allocation",
+  "FIF",
+  "SHIF",
+  "PHC",
+  "Partners",
+  "Donations",
+];
+
+const MONTHS = [
+  "All",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const MONTH_ORDER: Record<string, number> = {
+  Jan: 1,
+  Feb: 2,
+  Mar: 3,
+  Apr: 4,
+  May: 5,
+  Jun: 6,
+  Jul: 7,
+  Aug: 8,
+  Sep: 9,
+  Oct: 10,
+  Nov: 11,
+  Dec: 12,
+};
+
 function money(value: number) {
   return `KES ${Number(value || 0).toLocaleString()}`;
+}
+
+function normalizeMflCode(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\.0$/, "");
+}
+
+function withoutAll(values: string[]) {
+  return values.filter((value) => value !== "All");
+}
+
+function parseReportingPeriod(period: string) {
+  const parts = String(period || "")
+    .trim()
+    .split("-");
+
+  if (parts.length !== 2) {
+    return { month: "", year: "" };
+  }
+
+  const [first, second] = parts;
+
+  if (/^\d{4}$/.test(first)) {
+    return { year: first, month: second };
+  }
+
+  return { month: first, year: second };
+}
+
+function getReportingPeriodRank(period?: string) {
+  const { month, year } = parseReportingPeriod(String(period || ""));
+
+  return Number(year || 0) * 100 + Number(MONTH_ORDER[month] || 0);
+}
+
+function matchesFundingSource(
+  fundingSource: string,
+  selectedSources: string[]
+) {
+  if (selectedSources.length === 0) {
+    return true;
+  }
+
+  const sourceText = String(fundingSource || "").toLowerCase();
+
+  return selectedSources.some((source) => {
+    const normalizedSource = source.toLowerCase();
+
+    if (normalizedSource === "partners") {
+      return sourceText.includes("partner");
+    }
+
+    if (normalizedSource === "donations") {
+      return (
+        sourceText.includes("donor") ||
+        sourceText.includes("donation")
+      );
+    }
+
+    return sourceText.includes(normalizedSource);
+  });
+}
+
+function getFundingChartCategory(fundingSource: string): string | null {
+  const sourceText = String(fundingSource || "").toLowerCase();
+
+  if (sourceText.includes("county allocation")) return "County Allocation";
+  if (sourceText.includes("fif")) return "FIF";
+  if (sourceText.includes("shif")) return "SHIF";
+  if (sourceText.includes("phc")) return "PHC";
+  if (sourceText.includes("partner")) return "Partners";
+
+  if (
+    sourceText.includes("donor") ||
+    sourceText.includes("donation")
+  ) {
+    return "Donations";
+  }
+
+  return null;
 }
 
 function KpiCard({
@@ -84,26 +202,12 @@ function KpiCard({
         <h3>{value}</h3>
         <span>{subtitle}</span>
       </div>
+
       <div className="kpi-icon">
         <Icon size={22} />
       </div>
     </div>
   );
-}
-function parseReportingPeriod(period: string) {
-  const parts = String(period || "").split("-");
-
-  if (parts.length !== 2) {
-    return { month: "", year: "" };
-  }
-
-  const [first, second] = parts;
-
-  if (/^\d{4}$/.test(first)) {
-    return { year: first, month: second };
-  }
-
-  return { month: first, year: second };
 }
 
 function CountyDashboard() {
@@ -111,38 +215,40 @@ function CountyDashboard() {
   const [facilities, setFacilities] = useState<FacilityCompliance[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [selectedSubcounty, setSelectedSubcounty] = useState(["All"]);
-  const [selectedMonth, setSelectedMonth] = useState(["All"]);
-  const [selectedFundingSource, setSelectedFundingSource] = useState(["All"]);
-  const [selectedWard, setSelectedWard] = useState(["All"]);
-  const [selectedFacility, setSelectedFacility] = useState(["All"]);
-  const [selectedYear, setSelectedYear] = useState(["All"]);
+
+  const [selectedSubcounty, setSelectedSubcounty] = useState<string[]>([
+    "All",
+  ]);
+  const [selectedWard, setSelectedWard] = useState<string[]>(["All"]);
+  const [selectedFacility, setSelectedFacility] = useState<string[]>([
+    "All",
+  ]);
+  const [selectedYear, setSelectedYear] = useState<string[]>(["All"]);
+  const [selectedMonth, setSelectedMonth] = useState<string[]>(["All"]);
+  const [selectedFundingSource, setSelectedFundingSource] = useState<
+    string[]
+  >(["All"]);
   const [searchTerm, setSearchTerm] = useState("");
-
- 
-
-
 
   const rowsPerPage = 10;
 
   useEffect(() => {
-  setLoading(true);
+    setLoading(true);
 
-  api.get(
-  `/dashboard/county?reporting_periods=All&subcounties=All&funding_sources=All`
-)
-    .then((res) => {
-      setSummary(res.data.summary);
-      setFacilities(res.data.facility_compliance || []);
-     
-    })
-    
-    .catch((err) => {
-      console.error(err);
-      alert("Failed to load dashboard data");
-    })
-    .finally(() => setLoading(false));
-}, []);
+    api
+      .get(
+        "/dashboard/county?reporting_periods=All&subcounties=All&funding_sources=All"
+      )
+      .then((res) => {
+        setSummary(res.data.summary);
+        setFacilities(res.data.facility_compliance || []);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to load dashboard data");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -152,194 +258,160 @@ function CountyDashboard() {
     return <div>No dashboard data found.</div>;
   }
 
- const subcounties = [
-  "All",
-  ...Array.from(
-    new Set(
-      facilities
-        .map((facility) => facility.subcounty_name)
-        .filter((name) => name && name.trim() !== "")
-    )
-  ).sort((a, b) => a.localeCompare(b)),
-];
+  const subcounties = [
+    "All",
+    ...Array.from(
+      new Set(
+        facilities
+          .map((facility) => facility.subcounty_name)
+          .filter((name) => name && name.trim() !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b)),
+  ];
 
-const facilitiesBySubcounty = facilities.filter(
-  (facility) =>
-    selectedSubcounty.includes("All") ||
-    selectedSubcounty.length === 0 ||
-    selectedSubcounty.includes(facility.subcounty_name)
-);
+  const facilitiesBySubcounty = facilities.filter(
+    (facility) =>
+      selectedSubcounty.includes("All") ||
+      selectedSubcounty.length === 0 ||
+      selectedSubcounty.includes(facility.subcounty_name)
+  );
 
-const wards = [
-  "All",
-  ...Array.from(
-    new Set(
-      facilitiesBySubcounty
-        .map((facility) => facility.ward_name)
-        .filter((name) => name && name.trim() !== "")
-    )
-  ).sort((a, b) => a.localeCompare(b)),
-];
+  const wards = [
+    "All",
+    ...Array.from(
+      new Set(
+        facilitiesBySubcounty
+          .map((facility) => facility.ward_name)
+          .filter((name) => name && name.trim() !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b)),
+  ];
 
-const facilitiesByWard = facilitiesBySubcounty.filter(
-  (facility) =>
-    selectedWard.includes("All") ||
-    selectedWard.length === 0 ||
-    selectedWard.includes(facility.ward_name)
-);
+  const facilitiesByWard = facilitiesBySubcounty.filter(
+    (facility) =>
+      selectedWard.includes("All") ||
+      selectedWard.length === 0 ||
+      selectedWard.includes(facility.ward_name)
+  );
 
-const facilityOptions = [
-  "All",
-  ...Array.from(
-    new Set(
-      facilitiesByWard
-        .map(
-          (facility) =>
-            `${facility.facility_name} - ${String(
-              facility.mfl_code
-            ).replace(/\.0$/, "")}`
-        )
-        .filter((name) => name && name.trim() !== "")
-    )
-  ).sort((a, b) => a.localeCompare(b)),
-];
+  const facilityOptions = [
+    "All",
+    ...Array.from(
+      new Set(
+        facilitiesByWard
+          .map((facility) => {
+            const mflCode = normalizeMflCode(facility.mfl_code);
+            return `${facility.facility_name} - ${mflCode}`;
+          })
+          .filter((name) => name && name.trim() !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b)),
+  ];
 
-const months = [
-  "All",
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+  const currentYear = new Date().getFullYear();
 
-const currentYear = new Date().getFullYear();
+  const years = [
+    "All",
+    ...Array.from(
+      { length: currentYear - 2026 + 6 },
+      (_, index) => String(2026 + index)
+    ),
+  ];
 
-const years = [
-  "All",
-  ...Array.from(
-    { length: currentYear - 2026 + 6 },
-    (_, index) => String(2026 + index)
-  ),
-];
-  console.log("Current selectedSubcounty:", selectedSubcounty);
-  const activeSubcounties = selectedSubcounty.filter(
-  (item) => item !== "All"
-);
- 
+  const activeSubcounties = withoutAll(selectedSubcounty);
+  const activeWards = withoutAll(selectedWard);
+  const activeFacilities = withoutAll(selectedFacility);
+  const activeYears = withoutAll(selectedYear);
+  const activeMonths = withoutAll(selectedMonth);
+  const activeFundingSources = withoutAll(selectedFundingSource);
 
-const activeWards = selectedWard.filter(
-  (item) => item !== "All"
-);
-
-const activeFacilities = selectedFacility.filter(
-  (item) => item !== "All"
-);
-
-const filteredFacilities = facilities.filter((facility) => {
-  const mflCode = String(facility.mfl_code ?? "").replace(/\.0$/, "");
-
-  const facilityLabel = `${facility.facility_name} - ${mflCode}`;
-
-  const matchesSubcounty =
-    activeSubcounties.length === 0 ||
-    activeSubcounties.includes(facility.subcounty_name);
-
-  const matchesWard =
-    activeWards.length === 0 ||
-    activeWards.includes(facility.ward_name);
-
-  const matchesFacility =
-    activeFacilities.length === 0 ||
-    activeFacilities.includes(facilityLabel);
-
-  return matchesSubcounty && matchesWard && matchesFacility;
-});
- 
-const monthOrder: Record<string, number> = {
-  Jan: 1,
-  Feb: 2,
-  Mar: 3,
-  Apr: 4,
-  May: 5,
-  Jun: 6,
-  Jul: 7,
-  Aug: 8,
-  Sep: 9,
-  Oct: 10,
-  Nov: 11,
-  Dec: 12,
-};
-
-const fundingSourceChartData = Object.values(
-  filteredFacilities.reduce((acc: any, facility: any) => {
+  const filteredFacilities = facilities.filter((facility) => {
+    const mflCode = normalizeMflCode(facility.mfl_code);
+    const facilityLabel = `${facility.facility_name} - ${mflCode}`;
     const { month, year } = parseReportingPeriod(facility.reporting_period);
-    const period = month && year ? `${month}-${year}` : "Unknown";
-    const sourceText = String(facility.funding_source || "");
+    const fundingSourceText = String(
+      facility.funding_source || ""
+    ).toLowerCase();
+    const searchValue = searchTerm.trim().toLowerCase();
 
-    if (!acc[period]) {
-      acc[period] = { reporting_period: period };
-    }
+    const matchesSubcounty =
+      activeSubcounties.length === 0 ||
+      activeSubcounties.includes(facility.subcounty_name);
 
-    ["County Allocation", "FIF", "SHIF", "PHC", "Partners", "Donations"].forEach(
-      (source) => {
-        if (sourceText.toLowerCase().includes(source.toLowerCase())) {
-          acc[period][source] =
-            (acc[period][source] || 0) + Number(facility.amount_received || 0);
-        }
-      }
+    const matchesWard =
+      activeWards.length === 0 || activeWards.includes(facility.ward_name);
+
+    const matchesFacility =
+      activeFacilities.length === 0 ||
+      activeFacilities.includes(facilityLabel);
+
+    const matchesYear =
+      activeYears.length === 0 || activeYears.includes(year);
+
+    const matchesMonth =
+      activeMonths.length === 0 || activeMonths.includes(month);
+
+    const matchesFunding = matchesFundingSource(
+      facility.funding_source,
+      activeFundingSources
     );
 
-    return acc;
-  }, {})
-).sort((a: any, b: any) => {
-  const [m1, y1] = a.reporting_period.split("-");
-  const [m2, y2] = b.reporting_period.split("-");
+    const matchesSearch =
+      searchValue === "" ||
+      String(facility.facility_name || "")
+        .toLowerCase()
+        .includes(searchValue) ||
+      mflCode.toLowerCase().includes(searchValue) ||
+      String(facility.subcounty_name || "")
+        .toLowerCase()
+        .includes(searchValue) ||
+      String(facility.ward_name || "")
+        .toLowerCase()
+        .includes(searchValue) ||
+      String(facility.reporting_period || "")
+        .toLowerCase()
+        .includes(searchValue) ||
+      fundingSourceText.includes(searchValue);
 
-  return Number(y1) - Number(y2) || monthOrder[m1] - monthOrder[m2];
-});
+    return (
+      matchesSubcounty &&
+      matchesWard &&
+      matchesFacility &&
+      matchesYear &&
+      matchesMonth &&
+      matchesFunding &&
+      matchesSearch
+    );
+  });
 
-const hptAllocationChartData = Object.values(
-  filteredFacilities.reduce((acc: any, facility: any) => {
-    const { month, year } = parseReportingPeriod(facility.reporting_period);
-    const period = month && year ? `${month}-${year}` : "Unknown";
+  const latestFacilityMap = new Map<string, FacilityCompliance>();
 
-    if (!acc[period]) {
-      acc[period] = {
-        reporting_period: period,
-        amount_received: 0,
-        hpt_allocated: 0,
-        hpt_spent: 0,
-        chp_kits_used: 0,
-      };
+  filteredFacilities.forEach((facility) => {
+    const mflCode = normalizeMflCode(facility.mfl_code);
+    const facilityKey = mflCode || String(facility.facility_name || "");
+    const currentRecord = latestFacilityMap.get(facilityKey);
+
+    if (
+      !currentRecord ||
+      getReportingPeriodRank(facility.reporting_period) >
+        getReportingPeriodRank(currentRecord.reporting_period)
+    ) {
+      latestFacilityMap.set(facilityKey, facility);
     }
+  });
 
-    acc[period].amount_received += Number(facility.amount_received || 0);
-    acc[period].hpt_allocated += Number(facility.hpt_allocated || 0);
-    acc[period].hpt_spent += Number(facility.hpt_spent || 0);
-    acc[period].chp_kits_used += Number(facility.amount_used_for_chp_kits || 0);
-
-    return acc;
-  }, {})
-).sort((a: any, b: any) => {
-  const [m1, y1] = a.reporting_period.split("-");
-  const [m2, y2] = b.reporting_period.split("-");
-
-  return Number(y1) - Number(y2) || monthOrder[m1] - monthOrder[m2];
-});
+  const latestFacilityRecords = Array.from(latestFacilityMap.values());
+  const submittedFacilityCount = latestFacilityRecords.length;
+  const facilityComplianceDenominator = submittedFacilityCount || 1;
+  const submissionCount = filteredFacilities.length;
+  const submissionComplianceDenominator = submissionCount || 1;
 
   const filteredSummary = {
     total_amount_received: filteredFacilities.reduce(
-  (sum, facility) => sum + Number(facility.amount_received || 0),
-  0
-),
+      (sum, facility) => sum + Number(facility.amount_received || 0),
+      0
+    ),
+
     total_hpt_allocated: filteredFacilities.reduce(
       (sum, facility) => sum + Number(facility.hpt_allocated || 0),
       0
@@ -351,24 +423,25 @@ const hptAllocationChartData = Object.values(
     ),
 
     total_chp_kits_used: filteredFacilities.reduce(
-      (sum, facility) => sum + Number(facility.amount_used_for_chp_kits || 0),
+      (sum, facility) =>
+        sum + Number(facility.amount_used_for_chp_kits || 0),
       0
     ),
 
-    compliant_facilities: filteredFacilities.filter(
+    compliant_facilities: latestFacilityRecords.filter(
       (facility) => facility.compliance_status === "Compliant"
     ).length,
 
-    non_compliant_facilities: filteredFacilities.filter(
+    non_compliant_facilities: latestFacilityRecords.filter(
       (facility) => facility.compliance_status === "Non-Compliant"
     ).length,
 
-    chp_kits_compliant_facilities: filteredFacilities.filter(
-      (facility) => facility.chp_kits_status === "Compliant"
+    compliant_submissions: filteredFacilities.filter(
+      (facility) => facility.compliance_status === "Compliant"
     ).length,
 
-    chp_kits_below_target_facilities: filteredFacilities.filter(
-      (facility) => facility.chp_kits_status === "Below Target"
+    non_compliant_submissions: filteredFacilities.filter(
+      (facility) => facility.compliance_status === "Non-Compliant"
     ).length,
   };
 
@@ -399,9 +472,89 @@ const hptAllocationChartData = Object.values(
         ).toFixed(2)
       : "0.00";
 
-  const submittedFacilities = filteredFacilities.length || 1;
+  const fundingSourceChartData = Object.values(
+    filteredFacilities.reduce(
+      (
+        acc: Record<string, Record<string, string | number>>,
+        facility
+      ) => {
+        const { month, year } = parseReportingPeriod(
+          facility.reporting_period
+        );
+        const period = month && year ? `${month}-${year}` : "Unknown";
 
+        if (!acc[period]) {
+          acc[period] = { reporting_period: period };
+        }
 
+        const category = getFundingChartCategory(facility.funding_source);
+
+        if (category) {
+          acc[period][category] =
+            Number(acc[period][category] || 0) +
+            Number(facility.amount_received || 0);
+        }
+
+        return acc;
+      },
+      {}
+    )
+  ).sort((a: any, b: any) => {
+    const [m1, y1] = a.reporting_period.split("-");
+    const [m2, y2] = b.reporting_period.split("-");
+
+    return Number(y1) - Number(y2) || MONTH_ORDER[m1] - MONTH_ORDER[m2];
+  });
+
+  const hptAllocationChartData = Object.values(
+    filteredFacilities.reduce(
+      (
+        acc: Record<
+          string,
+          {
+            reporting_period: string;
+            amount_received: number;
+            hpt_allocated: number;
+            hpt_spent: number;
+            chp_kits_used: number;
+          }
+        >,
+        facility
+      ) => {
+        const { month, year } = parseReportingPeriod(
+          facility.reporting_period
+        );
+        const period = month && year ? `${month}-${year}` : "Unknown";
+
+        if (!acc[period]) {
+          acc[period] = {
+            reporting_period: period,
+            amount_received: 0,
+            hpt_allocated: 0,
+            hpt_spent: 0,
+            chp_kits_used: 0,
+          };
+        }
+
+        acc[period].amount_received += Number(
+          facility.amount_received || 0
+        );
+        acc[period].hpt_allocated += Number(facility.hpt_allocated || 0);
+        acc[period].hpt_spent += Number(facility.hpt_spent || 0);
+        acc[period].chp_kits_used += Number(
+          facility.amount_used_for_chp_kits || 0
+        );
+
+        return acc;
+      },
+      {}
+    )
+  ).sort((a, b) => {
+    const [m1, y1] = a.reporting_period.split("-");
+    const [m2, y2] = b.reporting_period.split("-");
+
+    return Number(y1) - Number(y2) || MONTH_ORDER[m1] - MONTH_ORDER[m2];
+  });
 
   const totalPages = Math.max(
     1,
@@ -416,41 +569,51 @@ const hptAllocationChartData = Object.values(
   function downloadCSV() {
     const headers = [
       "Facility",
+      "MFL Code",
       "Subcounty",
       "Ward",
+      "Reporting Period",
+      "Funding Source",
       "Amount Received",
       "HPT Allocated",
       "HPT Spent",
       "HPT %",
       "HPT Status",
       "CHP Kits Amount",
-
     ];
 
     const rows = filteredFacilities.map((facility) => [
-  facility.facility_name,
-  facility.subcounty_name,
-  facility.ward_name,
-  facility.amount_received,
-  facility.hpt_allocated,
-  facility.hpt_spent,
-  facility.hpt_percent,
-  facility.compliance_status,
-  facility.amount_used_for_chp_kits,
-]);
+      facility.facility_name,
+      normalizeMflCode(facility.mfl_code),
+      facility.subcounty_name,
+      facility.ward_name,
+      facility.reporting_period,
+      facility.funding_source,
+      facility.amount_received,
+      facility.hpt_allocated,
+      facility.hpt_spent,
+      facility.hpt_percent,
+      facility.compliance_status,
+      facility.amount_used_for_chp_kits,
+    ]);
 
     const csv = [headers, ...rows]
       .map((row) =>
         row
-          .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
+          .map(
+            (cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`
+          )
           .join(",")
       )
       .join("\n");
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = "facility_compliance.csv";
     link.click();
@@ -466,92 +629,90 @@ const hptAllocationChartData = Object.values(
       </div>
 
       <div className="dashboard-filters">
-  <MultiCheckboxFilter
-    label="Subcounty"
-    options={subcounties.filter((item) => item !== "All")}
-    selected={selectedSubcounty}
-    onChange={(values) => {
-      console.log("Selected Subcounty:", values);
-      setSelectedSubcounty(values);
-      setPage(1);
-    }}
-  />
+        <MultiCheckboxFilter
+          label="Subcounty"
+          options={subcounties.filter((item) => item !== "All")}
+          selected={selectedSubcounty}
+          onChange={(values) => {
+            setSelectedSubcounty(values);
+            setSelectedWard(["All"]);
+            setSelectedFacility(["All"]);
+            setPage(1);
+          }}
+        />
 
-  <MultiCheckboxFilter
-    label="Ward"
-    options={wards.filter((item) => item !== "All")}
-    selected={selectedWard}
-    onChange={(values) => {
-      setSelectedWard(values);
-      setPage(1);
-    }}
-  />
+        <MultiCheckboxFilter
+          label="Ward"
+          options={wards.filter((item) => item !== "All")}
+          selected={selectedWard}
+          onChange={(values) => {
+            setSelectedWard(values);
+            setSelectedFacility(["All"]);
+            setPage(1);
+          }}
+        />
 
- <MultiCheckboxFilter
-  label="Facility"
-  options={facilityOptions.filter((item) => item !== "All")}
-  selected={selectedFacility}
-  onChange={(values) => {
-    setSelectedFacility(values);
-    setPage(1);
-  }}
-/>
+        <MultiCheckboxFilter
+          label="Facility"
+          options={facilityOptions.filter((item) => item !== "All")}
+          selected={selectedFacility}
+          onChange={(values) => {
+            setSelectedFacility(values);
+            setPage(1);
+          }}
+        />
 
-  <MultiCheckboxFilter
-    label="Year"
-    options={years.filter((item) => item !== "All")}
-    selected={selectedYear}
-    onChange={(values) => {
-      setSelectedYear(values);
-      setPage(1);
-    }}
-  />
+        <MultiCheckboxFilter
+          label="Year"
+          options={years.filter((item) => item !== "All")}
+          selected={selectedYear}
+          onChange={(values) => {
+            setSelectedYear(values);
+            setPage(1);
+          }}
+        />
 
-  <MultiCheckboxFilter
-    label="Month"
-    options={months.filter((item) => item !== "All")}
-    selected={selectedMonth}
-    onChange={(values) => {
-      setSelectedMonth(values);
-      setPage(1);
-    }}
-  />
+        <MultiCheckboxFilter
+          label="Month"
+          options={MONTHS.filter((item) => item !== "All")}
+          selected={selectedMonth}
+          onChange={(values) => {
+            setSelectedMonth(values);
+            setPage(1);
+          }}
+        />
 
-  <MultiCheckboxFilter
-    label="Funding Source"
-    options={[
-      "County Allocation",
-      "FIF",
-      "SHIF",
-      "PHC",
-      "Partners",
-      "Donations",
-    ]}
-    selected={selectedFundingSource}
-    onChange={(values) => {
-      setSelectedFundingSource(values);
-      setPage(1);
-    }}
-  />
+        <MultiCheckboxFilter
+          label="Funding Source"
+          options={FUNDING_SOURCE_OPTIONS}
+          selected={selectedFundingSource}
+          onChange={(values) => {
+            setSelectedFundingSource(values);
+            setPage(1);
+          }}
+        />
 
-  <div className="dashboard-search">
-    <label>Search</label>
-    <input
-      type="text"
-      placeholder="Search facility, MFL, ward, subcounty"
-      value={searchTerm}
-      onChange={(e) => {
-        setSearchTerm(e.target.value);
-        setPage(1);
-      }}
-    />
-  </div>
-</div>
+        <div className="dashboard-search">
+          <label>Search</label>
+          <input
+            type="text"
+            placeholder="Search facility, MFL, ward, subcounty"
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+      </div>
+
       <div className="kpi-grid">
         <KpiCard
           title="Total Funds Received"
           value={money(filteredSummary.total_amount_received)}
-          subtitle={`${filteredFacilities.length} facilities submitted`}
+          subtitle={`${submittedFacilityCount} ${
+            submittedFacilityCount === 1 ? "facility" : "facilities"
+          } submitted`}
           icon={Wallet}
         />
 
@@ -575,148 +736,207 @@ const hptAllocationChartData = Object.values(
           subtitle={`${filteredChpPercent}% of HPT allocation`}
           icon={Package}
         />
-
-
       </div>
 
       <div className="dashboard-analysis-grid">
-  <div className="compliance-stack">
-    <div className="chart-card">
-      <h3>HPT Compliance Status</h3>
+        <div className="compliance-stack">
+          <div className="chart-card">
+            <h3>HPT Facility Compliance Status</h3>
 
-      <div className="compliance-bars">
-        <div className="compliance-row">
-          <div>
-            <strong>Compliant</strong>
-            <span>Facilities meeting 40% HPT requirement</span>
+            <div className="compliance-bars">
+              <div className="compliance-row">
+                <div>
+                  <strong>Compliant Facilities</strong>
+                  <span>
+                    Latest filtered submission meets the 40% requirement
+                  </span>
+                </div>
+                <b>{filteredSummary.compliant_facilities}</b>
+              </div>
+
+              <div className="bar-track">
+                <div
+                  className="bar-fill green"
+                  style={{
+                    width: `${
+                      (filteredSummary.compliant_facilities /
+                        facilityComplianceDenominator) *
+                      100
+                    }%`,
+                  }}
+                />
+              </div>
+
+              <div className="compliance-row">
+                <div>
+                  <strong>Non-Compliant Facilities</strong>
+                  <span>
+                    Latest filtered submission is below the 40% requirement
+                  </span>
+                </div>
+                <b>{filteredSummary.non_compliant_facilities}</b>
+              </div>
+
+              <div className="bar-track">
+                <div
+                  className="bar-fill red"
+                  style={{
+                    width: `${
+                      (filteredSummary.non_compliant_facilities /
+                        facilityComplianceDenominator) *
+                      100
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
-          <b>{filteredSummary.compliant_facilities}</b>
-        </div>
 
-        <div className="bar-track">
-          <div
-            className="bar-fill green"
-            style={{
-              width: `${
-                (filteredSummary.compliant_facilities / submittedFacilities) *
-                100
-              }%`,
-            }}
-          />
-        </div>
+          <div className="chart-card">
+            <h3>Submission Compliance Status</h3>
 
-        <div className="compliance-row">
-          <div>
-            <strong>Non-Compliant</strong>
-            <span>Facilities below 40% HPT requirement</span>
+            <div className="compliance-bars">
+              <div className="compliance-row">
+                <div>
+                  <strong>Compliant Submissions</strong>
+                  <span>
+                    Filtered monthly submissions meeting the 40% requirement
+                  </span>
+                </div>
+                <b>{filteredSummary.compliant_submissions}</b>
+              </div>
+
+              <div className="bar-track">
+                <div
+                  className="bar-fill green"
+                  style={{
+                    width: `${
+                      (filteredSummary.compliant_submissions /
+                        submissionComplianceDenominator) *
+                      100
+                    }%`,
+                  }}
+                />
+              </div>
+
+              <div className="compliance-row">
+                <div>
+                  <strong>Non-Compliant Submissions</strong>
+                  <span>
+                    Filtered monthly submissions below the 40% requirement
+                  </span>
+                </div>
+                <b>{filteredSummary.non_compliant_submissions}</b>
+              </div>
+
+              <div className="bar-track">
+                <div
+                  className="bar-fill red"
+                  style={{
+                    width: `${
+                      (filteredSummary.non_compliant_submissions /
+                        submissionComplianceDenominator) *
+                      100
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
-          <b>{filteredSummary.non_compliant_facilities}</b>
         </div>
 
-        <div className="bar-track">
-          <div
-            className="bar-fill red"
-            style={{
-              width: `${
-                (filteredSummary.non_compliant_facilities /
-                  submittedFacilities) *
-                100
-              }%`,
-            }}
-          />
+        <div className="trend-stack">
+          <div className="chart-card wide">
+            <h3>Funding Source Trend</h3>
+
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={fundingSourceChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="reporting_period" />
+                <YAxis
+                  tickFormatter={(value) =>
+                    `${(Number(value) / 1000000).toFixed(1)}M`
+                  }
+                />
+                <Tooltip
+                  formatter={(value) =>
+                    `KES ${Number(value || 0).toLocaleString()}`
+                  }
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="County Allocation"
+                  stroke="#2563eb"
+                />
+                <Line type="monotone" dataKey="FIF" stroke="#16a34a" />
+                <Line type="monotone" dataKey="SHIF" stroke="#f97316" />
+                <Line type="monotone" dataKey="PHC" stroke="#7c3aed" />
+                <Line
+                  type="monotone"
+                  dataKey="Partners"
+                  stroke="#0f766e"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Donations"
+                  stroke="#dc2626"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="chart-card wide">
+            <h3>Total Allocation Trend</h3>
+
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={hptAllocationChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="reporting_period" />
+                <YAxis
+                  tickFormatter={(value) =>
+                    `${(Number(value) / 1000000).toFixed(1)}M`
+                  }
+                />
+                <Tooltip
+                  formatter={(value) =>
+                    `KES ${Number(value || 0).toLocaleString()}`
+                  }
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="amount_received"
+                  name="Total Funds Received"
+                  stroke="#2563eb"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="hpt_spent"
+                  name="HPT Expenditure"
+                  stroke="#f97316"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="chp_kits_used"
+                  name="CHP Kits Support"
+                  stroke="#7c3aed"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
-    </div>
-
-    
-  </div>
-
-  <div className="trend-stack">
-    <div className="chart-card wide">
-      <h3>Funding Source Trend</h3>
-
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={fundingSourceChartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="reporting_period" />
-
-          <YAxis
-            tickFormatter={(value) =>
-              `${(Number(value) / 1000000).toFixed(1)}M`
-            }
-          />
-
-          <Tooltip
-            formatter={(value) =>
-              `KES ${Number(value || 0).toLocaleString()}`
-            }
-          />
-
-          <Legend />
-
-          <Line type="monotone" dataKey="County Allocation" stroke="#2563eb" />
-          <Line type="monotone" dataKey="FIF" stroke="#16a34a" />
-          <Line type="monotone" dataKey="SHIF" stroke="#f97316" />
-          <Line type="monotone" dataKey="PHC" stroke="#7c3aed" />
-          <Line type="monotone" dataKey="Partners" stroke="#0f766e" />
-          <Line type="monotone" dataKey="Donations" stroke="#dc2626" />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-
-    <div className="chart-card wide">
-      <h3>Total Allocation Trend</h3>
-
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={hptAllocationChartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="reporting_period" />
-
-          <YAxis
-            tickFormatter={(value) =>
-              `${(Number(value) / 1000000).toFixed(1)}M`
-            }
-          />
-
-          <Tooltip
-            formatter={(value) =>
-              `KES ${Number(value || 0).toLocaleString()}`
-            }
-          />
-
-          <Legend />
-
-          <Line
-            type="monotone"
-            dataKey="amount_received"
-            name="Total Funds Received"
-            stroke="#2563eb"
-          />
-
-          <Line
-            type="monotone"
-            dataKey="hpt_spent"
-            name="HPT Expenditure"
-            stroke="#f97316"
-          />
-
-          <Line
-            type="monotone"
-            dataKey="chp_kits_used"
-            name="CHP Kits Support"
-            stroke="#7c3aed"
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-</div>
 
       <div className="chart-card wide">
         <div className="table-title-row">
           <h3>Facility Compliance Table</h3>
 
-          <button className="download-btn" onClick={downloadCSV}>
+          <button
+            className="download-btn"
+            type="button"
+            onClick={downloadCSV}
+          >
             <Download size={16} />
             Download Table
           </button>
@@ -728,18 +948,25 @@ const hptAllocationChartData = Object.values(
               <tr>
                 <th>Facility</th>
                 <th>Subcounty</th>
+                <th>Ward</th>
+                <th>Reporting Period</th>
+                <th>Funding Source</th>
                 <th>HPT %</th>
                 <th>HPT Status</th>
                 <th>CHP Kits Amount</th>
-
               </tr>
             </thead>
 
             <tbody>
-              {paginatedFacilities.map((facility) => (
-                <tr key={facility.mfl_code}>
+              {paginatedFacilities.map((facility, index) => (
+                <tr
+                  key={`${facility.mfl_code}-${facility.reporting_period}-${index}`}
+                >
                   <td>{facility.facility_name}</td>
                   <td>{facility.subcounty_name || "—"}</td>
+                  <td>{facility.ward_name || "—"}</td>
+                  <td>{facility.reporting_period || "—"}</td>
+                  <td>{facility.funding_source || "—"}</td>
                   <td>{facility.hpt_percent}%</td>
                   <td>
                     <span
@@ -753,15 +980,26 @@ const hptAllocationChartData = Object.values(
                     </span>
                   </td>
                   <td>{money(facility.amount_used_for_chp_kits)}</td>
-
                 </tr>
               ))}
+
+              {paginatedFacilities.length === 0 && (
+                <tr>
+                  <td colSpan={8}>
+                    No records found for the selected filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="pagination">
-          <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+          <button
+            type="button"
+            disabled={page === 1}
+            onClick={() => setPage((currentPage) => currentPage - 1)}
+          >
             Previous
           </button>
 
@@ -770,8 +1008,9 @@ const hptAllocationChartData = Object.values(
           </span>
 
           <button
+            type="button"
             disabled={page === totalPages}
-            onClick={() => setPage(page + 1)}
+            onClick={() => setPage((currentPage) => currentPage + 1)}
           >
             Next
           </button>

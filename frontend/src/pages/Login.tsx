@@ -45,7 +45,7 @@ function Login() {
         <header className="login-header">
           <img src="/assets/nakuru-logo.png" alt="Nakuru County Logo" className="county-logo" />
           <h1>NAKURU COUNTY</h1>
-          <h2>HPT - Financial Monitoring System</h2>
+          <h2>HPT - Financial Information Monitoring System</h2>
           <p>Healthy People, Prosperous County</p>
         </header>
 

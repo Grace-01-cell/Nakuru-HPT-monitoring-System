@@ -8,25 +8,44 @@ type Props = {
   onChange: (values: string[]) => void;
 };
 
-function MultiCheckboxFilter({ label, options, selected, onChange }: Props) {
+function MultiCheckboxFilter({
+  label,
+  options,
+  selected,
+  onChange,
+}: Props) {
   const [open, setOpen] = useState(false);
-  const allSelected = selected.includes("All");
+
+  const allSelected =
+    selected.length === 0 || selected.includes("All");
 
   function toggleOption(option: string) {
     if (option === "All") {
       onChange(["All"]);
+      setOpen(false);
       return;
     }
 
-    let updated = allSelected
-      ? [option]
-      : selected.includes(option)
-      ? selected.filter((item) => item !== option)
-      : [...selected, option];
+    let updatedValues: string[];
 
-    if (updated.length === 0) updated = ["All"];
+    if (allSelected) {
+      updatedValues = [option];
+    } else if (selected.includes(option)) {
+      updatedValues = selected.filter(
+        (item) => item !== option
+      );
+    } else {
+      updatedValues = [...selected, option];
+    }
 
-    onChange(updated);
+    if (updatedValues.length === 0) {
+      updatedValues = ["All"];
+    }
+
+    onChange(updatedValues);
+
+    // Close the dropdown immediately after selection.
+    setOpen(false);
   }
 
   const displayText = allSelected
@@ -42,10 +61,13 @@ function MultiCheckboxFilter({ label, options, selected, onChange }: Props) {
       <button
         type="button"
         className="multi-filter-button"
-        onClick={() => setOpen(!open)}
+        onClick={() =>
+          setOpen((currentOpen) => !currentOpen)
+        }
+        aria-expanded={open}
       >
         <span>{displayText}</span>
-        <span>⌄</span>
+        <span>{open ? "⌃" : "⌄"}</span>
       </button>
 
       {open && (
@@ -60,11 +82,19 @@ function MultiCheckboxFilter({ label, options, selected, onChange }: Props) {
           </label>
 
           {options.map((option) => (
-            <label className="check-row" key={option}>
+            <label
+              className="check-row"
+              key={option}
+            >
               <input
                 type="checkbox"
-                checked={!allSelected && selected.includes(option)}
-                onChange={() => toggleOption(option)}
+                checked={
+                  !allSelected &&
+                  selected.includes(option)
+                }
+                onChange={() =>
+                  toggleOption(option)
+                }
               />
               {option}
             </label>

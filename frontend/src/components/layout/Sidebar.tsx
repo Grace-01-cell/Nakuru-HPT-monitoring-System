@@ -75,7 +75,7 @@ if (role === "admin") {
         <div>
           <h2>Nakuru County</h2>
           <p>HPT - FIMS
-Financial Monitoring System</p>
+Financial Information Monitoring System</p>
         </div>
       </div>
 
