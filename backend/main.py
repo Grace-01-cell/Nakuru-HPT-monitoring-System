@@ -12,6 +12,7 @@ from database import Base, engine, get_db
 from models import SupportingDocument, User
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 # Create any database tables that do not already exist.
 Base.metadata.create_all(bind=engine)
 
@@ -56,6 +57,8 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 REQUIRED_HPT_PERCENT = 40
 REQUIRED_CHP_KIT_PERCENT_OF_HPT = 5
+
+MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -674,45 +677,140 @@ async def submit_record(
     amount_used_for_chp_kits: float = Form(0),
     submitted_by: str = Form("facility_user"),
     supporting_document: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
 ):
-    UPLOAD_DIR.mkdir(exist_ok=True)
+    document_url = ""
+    document_id = None
 
-    document_name = ""
+    try:
+        if supporting_document:
+            if supporting_document.content_type != "application/pdf":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only PDF documents are allowed.",
+                )
 
-    if supporting_document:
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        document_name = f"{timestamp}_{supporting_document.filename}"
-        file_path = UPLOAD_DIR / document_name
+            file_bytes = await supporting_document.read()
 
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(supporting_document.file, buffer)
+            if not file_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail="The uploaded PDF is empty.",
+                )
 
-    old_df = pd.read_excel(HPT_FILE)
-    old_df = clean_columns(old_df)
+            if len(file_bytes) > MAX_DOCUMENT_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail="The PDF must not exceed 10 MB.",
+                )
 
-    new_record = {
-        "mfl_code": mfl_code,
-        "amount_received": amount_received,
-        "funding_source": funding_source,
-         "reporting_period": reporting_period,
-        "procurement_source": procurement_source,
-        "date_received": date_received,
-        "amount_allocated_to_hpt": amount_allocated_to_hpt,
-        "amount_spent_on_hpt": amount_spent_on_hpt,
-        "amount_used_for_chp_kits": amount_used_for_chp_kits,
-        "supporting_document": f"/uploads/{document_name}" if document_name else "",
-        "submitted_by": submitted_by,
-        "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-       
-    }
+            document = SupportingDocument(
+                original_filename=(
+                    supporting_document.filename
+                    or "supporting_document.pdf"
+                ),
+                content_type=(
+                    supporting_document.content_type
+                    or "application/pdf"
+                ),
+                file_size=len(file_bytes),
+                file_data=file_bytes,
+                uploaded_by=submitted_by,
+            )
 
-    updated_df = pd.concat([old_df, pd.DataFrame([new_record])], ignore_index=True)
-    updated_df.to_excel(HPT_FILE, index=False)
+            db.add(document)
+            db.flush()
 
-    return {
-        "message": "Record submitted successfully",
-        "record": new_record,
-    }
+            document_id = document.id
+            document_url = f"/documents/{document.id}"
+
+        old_df = pd.read_excel(HPT_FILE)
+        old_df = clean_columns(old_df)
+
+        new_record = {
+            "mfl_code": mfl_code,
+            "amount_received": amount_received,
+            "funding_source": funding_source,
+            "reporting_period": reporting_period,
+            "procurement_source": procurement_source,
+            "date_received": date_received,
+            "amount_allocated_to_hpt": amount_allocated_to_hpt,
+            "amount_spent_on_hpt": amount_spent_on_hpt,
+            "amount_used_for_chp_kits": amount_used_for_chp_kits,
+            "supporting_document": document_url,
+            "submitted_by": submitted_by,
+            "submission_date": datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+        }
+
+        updated_df = pd.concat(
+            [old_df, pd.DataFrame([new_record])],
+            ignore_index=True,
+        )
+
+        updated_df.to_excel(HPT_FILE, index=False)
+
+        db.commit()
+
+        return {
+            "message": "Record submitted successfully",
+            "document_id": document_id,
+            "record": new_record,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except PermissionError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The HPT Excel file is open. Close it and try again."
+            ),
+        )
+
+    except Exception as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail="The submission could not be saved.",
+        ) from exc
+@app.get("/documents/{document_id}")
+def view_supporting_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    document = (
+        db.query(SupportingDocument)
+        .filter(SupportingDocument.id == document_id)
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Supporting document not found.",
+        )
+
+    safe_filename = (
+        document.original_filename
+        or "supporting_document.pdf"
+    ).replace('"', "")
+
+    return Response(
+        content=document.file_data,
+        media_type=document.content_type or "application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{safe_filename}"'
+            )
+        },
+    )
 @app.patch("/records/review")
 def review_submission(payload: ReviewRecordRequest):
     review_reason = payload.review_reason.strip()
@@ -870,47 +968,131 @@ def review_submission(payload: ReviewRecordRequest):
         },
     }
 @app.post("/records/replace-document")
-def replace_supporting_document(
+async def replace_supporting_document(
     mfl_code: str = Form(...),
     reporting_period: str = Form(...),
     supporting_document: UploadFile = File(...),
+    db: Session = Depends(get_db),
 ):
-    df = pd.read_excel(HPT_FILE)
-    df = clean_columns(df)
-
-    if "supporting_document" not in df.columns:
-        df["supporting_document"] = ""
-
-    mask = (
-        (df["mfl_code"].astype(str) == str(mfl_code))
-        & (df["reporting_period"].astype(str) == str(reporting_period))
-    )
-
-    if not mask.any():
-        return {
-            "success": False,
-            "message": "Submission record not found.",
-        }
-
     if supporting_document.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed.",
+        )
+
+    file_bytes = await supporting_document.read()
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded PDF is empty.",
+        )
+
+    if len(file_bytes) > MAX_DOCUMENT_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="The PDF must not exceed 10 MB.",
+        )
+
+    try:
+        df = pd.read_excel(HPT_FILE)
+        df = clean_columns(df)
+
+        if "supporting_document" not in df.columns:
+            df["supporting_document"] = ""
+
+        def normalize_mfl_code(value) -> str:
+            text = str(value).strip()
+
+            if text.endswith(".0"):
+                text = text[:-2]
+
+            return text
+
+        requested_mfl = normalize_mfl_code(mfl_code)
+        requested_period = str(reporting_period).strip()
+
+        mfl_values = df["mfl_code"].apply(
+            normalize_mfl_code
+        )
+
+        period_values = (
+            df["reporting_period"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        mask = (
+            (mfl_values == requested_mfl)
+            & (period_values == requested_period)
+        )
+
+        matching_indexes = df.index[mask].tolist()
+
+        if not matching_indexes:
+            raise HTTPException(
+                status_code=404,
+                detail="Submission record not found.",
+            )
+
+        document = SupportingDocument(
+            original_filename=(
+                supporting_document.filename
+                or "supporting_document.pdf"
+            ),
+            content_type=(
+                supporting_document.content_type
+                or "application/pdf"
+            ),
+            file_size=len(file_bytes),
+            file_data=file_bytes,
+            uploaded_by=mfl_code,
+        )
+
+        db.add(document)
+        db.flush()
+
+        document_url = f"/documents/{document.id}"
+
+        target_index = matching_indexes[-1]
+
+        df.at[
+            target_index,
+            "supporting_document",
+        ] = document_url
+
+        df.to_excel(HPT_FILE, index=False)
+
+        db.commit()
+
         return {
-            "success": False,
-            "message": "Only PDF files are allowed.",
+            "success": True,
+            "message": (
+                "Supporting document replaced successfully."
+            ),
+            "document_id": document.id,
+            "supporting_document": document_url,
         }
 
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    document_name = f"{timestamp}_{supporting_document.filename}"
-    file_path = UPLOAD_DIR / document_name
+    except HTTPException:
+        db.rollback()
+        raise
 
-    with file_path.open("wb") as buffer:
-        shutil.copyfileobj(supporting_document.file, buffer)
+    except PermissionError:
+        db.rollback()
 
-    df.loc[mask, "supporting_document"] = f"/uploads/{document_name}"
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The HPT Excel file is open. Close it and try again."
+            ),
+        )
 
-    df.to_excel(HPT_FILE, index=False)
+    except Exception as exc:
+        db.rollback()
 
-    return {
-        "success": True,
-        "message": "Supporting document replaced successfully.",
-        "supporting_document": f"/uploads/{document_name}",
-    }
+        raise HTTPException(
+            status_code=500,
+            detail="The supporting document could not be replaced.",
+        ) from exc
