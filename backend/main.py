@@ -9,7 +9,12 @@ import shutil
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from database import Base, engine, get_db
-from models import HPTRecord, SupportingDocument, User
+from models import (
+    HPTRecord,
+    SHAReport,
+    SupportingDocument,
+    User,
+)
 from auth import router as auth_router
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
@@ -59,6 +64,21 @@ REQUIRED_HPT_PERCENT = 40
 REQUIRED_CHP_KIT_PERCENT_OF_HPT = 5
 
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+
+ALLOWED_SHA_DOCUMENT_EXTENSIONS = {
+    ".pdf",
+    ".xls",
+    ".xlsx",
+}
+
+SHA_DOCUMENT_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": (
+        "application/vnd.openxmlformats-officedocument."
+        "spreadsheetml.sheet"
+    ),
+}
 
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -417,15 +437,64 @@ def get_joined_data(
 @app.get("/")
 def home():
     return {"message": "Nakuru HPT Monitoring API is running"}
+
+
 @app.get("/county-sha-reports")
-def get_county_sha_reports():
-    ensure_sha_file()
+def get_county_sha_reports(
+    db: Session = Depends(get_db),
+):
+    reports = (
+        db.query(SHAReport)
+        .order_by(
+            SHAReport.submitted_at.desc(),
+            SHAReport.report_id.desc(),
+        )
+        .all()
+    )
 
-    df = pd.read_excel(SHA_FILE)
-    df = clean_columns(df)
-    df = df.astype(object)
+    results = []
 
-    return df.fillna("").to_dict(orient="records")
+    for report in reports:
+        document_url = (
+            f"/documents/{report.supporting_document_id}"
+            if report.supporting_document_id
+            else ""
+        )
+
+        results.append(
+            {
+                "report_id": str(report.report_id),
+                "report_type": report.report_type or "",
+                "frequency": report.frequency or "",
+                "reporting_year": (
+                    report.reporting_year or ""
+                ),
+                "reporting_month": (
+                    report.reporting_month or ""
+                ),
+                "reporting_quarter": (
+                    report.reporting_quarter or ""
+                ),
+                "reporting_period": (
+                    report.reporting_period or ""
+                ),
+                "value": float(report.value or 0),
+                "submitted_by": (
+                    report.submitted_by or ""
+                ),
+                "notes": report.notes or "",
+                "supporting_document": document_url,
+                "submitted_at": (
+                    format_database_datetime(
+                        report.submitted_at
+                    )
+                ),
+            }
+        )
+
+    return results
+
+
 
 @app.get("/health")
 def health():
@@ -672,6 +741,32 @@ def facility_dashboard(mfl_code: str):
         },
         "records": df.astype(object).fillna("").to_dict(orient="records"),
     }
+def ensure_sha_file():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not SHA_FILE.exists():
+        columns = [
+            "report_id",
+            "report_type",
+            "frequency",
+            "reporting_year",
+            "reporting_month",
+            "reporting_quarter",
+            "reporting_period",
+            "value",
+            "submitted_by",
+            "notes",
+            "supporting_document",
+            "submitted_at",
+        ]
+
+        pd.DataFrame(
+            columns=columns
+        ).to_excel(
+            SHA_FILE,
+            index=False,
+        )
+
 @app.post("/county-sha-reports")
 async def submit_county_sha_report(
     report_type: str = Form(...),
@@ -682,66 +777,233 @@ async def submit_county_sha_report(
     submitted_by: str = Form("SHA Coordinator"),
     notes: str = Form(""),
     supporting_document: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
 ):
-    ensure_sha_file()
-
-    frequency = "Quarterly" if report_type == "SHA Contracted Facilities" else "Monthly"
-
-    reporting_period = (
-        f"{reporting_quarter}-{reporting_year}"
-        if frequency == "Quarterly"
-        else f"{reporting_month}-{reporting_year}"
-    )
-
-    document_path = ""
-
-    if supporting_document:
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        document_name = f"{timestamp}_{supporting_document.filename}"
-        file_path = SHA_UPLOAD_DIR / document_name
-
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(supporting_document.file, buffer)
-
-        document_path = f"/uploads/sha_reports/{document_name}"
-
-    df = pd.read_excel(SHA_FILE)
-    df = clean_columns(df)
-
-    new_record = {
-    "mfl_code": mfl_code,
-    "amount_received": amount_received,
-    "funding_source": funding_source,
-    "reporting_period": reporting_period,
-    "procurement_source": procurement_source,
-    "date_received": date_received,
-    "amount_allocated_to_hpt": amount_allocated_to_hpt,
-    "amount_spent_on_hpt": amount_spent_on_hpt,
-    "amount_used_for_chp_kits": amount_used_for_chp_kits,
-    "supporting_document": (
-        f"/uploads/{document_name}"
-        if document_name
-        else ""
-    ),
-    "submitted_by": submitted_by,
-    "submission_date": datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    ),
-
-    # Every new submission starts as Pending
-    "review_status": "Pending",
-    "review_reason": "",
-    "reviewed_by": "",
-    "reviewed_at": "",
-}
-    updated_df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
-    updated_df.to_excel(SHA_FILE, index=False)
-
-    return {
-        "success": True,
-        "message": "SHA report submitted successfully",
-        "record": new_record,
+    valid_report_types = {
+        "SHA Contracted Facilities",
+        "SHA Claims",
+        "SHA Reimbursements",
+        "SHA Rejections",
     }
+
+    cleaned_report_type = report_type.strip()
+    cleaned_year = reporting_year.strip()
+    cleaned_month = reporting_month.strip()
+    cleaned_quarter = reporting_quarter.strip()
+    cleaned_submitted_by = submitted_by.strip()
+    cleaned_notes = notes.strip()
+
+    if cleaned_report_type not in valid_report_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid SHA report type.",
+        )
+
+    if not cleaned_year:
+        raise HTTPException(
+            status_code=400,
+            detail="Reporting year is required.",
+        )
+
+    if cleaned_report_type == "SHA Contracted Facilities":
+        frequency = "Quarterly"
+
+        if not cleaned_quarter:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Reporting quarter is required for "
+                    "contracted facilities."
+                ),
+            )
+
+        reporting_period = (
+            f"{cleaned_quarter}-{cleaned_year}"
+        )
+
+        # Quarterly reports do not use a month.
+        cleaned_month = ""
+
+    else:
+        frequency = "Monthly"
+
+        if not cleaned_month:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Reporting month is required for "
+                    "this report type."
+                ),
+            )
+
+        reporting_period = (
+            f"{cleaned_month}-{cleaned_year}"
+        )
+
+        # Monthly reports do not use a quarter.
+        cleaned_quarter = ""
+
+    if value < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Report value cannot be negative.",
+        )
+
+    try:
+        supporting_document_id = None
+
+        if (
+            supporting_document
+            and supporting_document.filename
+        ):
+            original_filename = (
+                supporting_document.filename.strip()
+            )
+
+            file_extension = Path(
+                original_filename
+            ).suffix.lower()
+
+            if (
+                file_extension
+                not in ALLOWED_SHA_DOCUMENT_EXTENSIONS
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Only PDF, XLS and XLSX documents "
+                        "are allowed."
+                    ),
+                )
+
+            file_bytes = await supporting_document.read()
+
+            if not file_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "The uploaded supporting "
+                        "document is empty."
+                    ),
+                )
+
+            if len(file_bytes) > MAX_DOCUMENT_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "The supporting document must "
+                        "not exceed 10 MB."
+                    ),
+                )
+
+            stored_content_type = (
+                supporting_document.content_type
+                or SHA_DOCUMENT_CONTENT_TYPES[
+                    file_extension
+                ]
+            )
+
+            document = SupportingDocument(
+                original_filename=original_filename,
+                content_type=stored_content_type,
+                file_size=len(file_bytes),
+                file_data=file_bytes,
+                uploaded_by=(
+                    cleaned_submitted_by
+                    or "SHA Coordinator"
+                ),
+            )
+
+            db.add(document)
+            db.flush()
+
+            supporting_document_id = document.id
+
+        sha_report = SHAReport(
+            report_type=cleaned_report_type,
+            frequency=frequency,
+            reporting_year=cleaned_year,
+            reporting_month=cleaned_month,
+            reporting_quarter=cleaned_quarter,
+            reporting_period=reporting_period,
+            value=value,
+            submitted_by=(
+                cleaned_submitted_by
+                or "SHA Coordinator"
+            ),
+            notes=cleaned_notes,
+            supporting_document_id=(
+                supporting_document_id
+            ),
+        )
+
+        db.add(sha_report)
+        db.commit()
+        db.refresh(sha_report)
+
+        document_url = (
+            f"/documents/{supporting_document_id}"
+            if supporting_document_id
+            else ""
+        )
+
+        return {
+            "success": True,
+            "message": (
+                "SHA report submitted successfully."
+            ),
+            "report": {
+                "report_id": str(
+                    sha_report.report_id
+                ),
+                "report_type": (
+                    sha_report.report_type
+                ),
+                "frequency": sha_report.frequency,
+                "reporting_year": (
+                    sha_report.reporting_year
+                ),
+                "reporting_month": (
+                    sha_report.reporting_month or ""
+                ),
+                "reporting_quarter": (
+                    sha_report.reporting_quarter or ""
+                ),
+                "reporting_period": (
+                    sha_report.reporting_period
+                ),
+                "value": float(
+                    sha_report.value or 0
+                ),
+                "submitted_by": (
+                    sha_report.submitted_by or ""
+                ),
+                "notes": sha_report.notes or "",
+                "supporting_document": (
+                    document_url
+                ),
+                "submitted_at": (
+                    format_database_datetime(
+                        sha_report.submitted_at
+                    )
+                ),
+            },
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The SHA report could not be saved."
+            ),
+        ) from exc
+    
 @app.post("/submit-record")
 async def submit_record(
     mfl_code: str = Form(...),

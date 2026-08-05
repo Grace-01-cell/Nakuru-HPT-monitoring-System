@@ -4,6 +4,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Text,
     Integer,
     LargeBinary,
     String,
@@ -185,4 +186,77 @@ class HPTRecord(Base):
     reviewed_at = Column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+
+class SHAReport(Base):
+    __tablename__ = "sha_reports"
+
+    report_id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    report_type = Column(
+        String(100),
+        nullable=False,
+        index=True,
+    )
+
+    frequency = Column(
+        String(30),
+        nullable=False,
+    )
+
+    reporting_year = Column(
+        String(10),
+        nullable=False,
+        index=True,
+    )
+
+    reporting_month = Column(
+        String(20),
+        nullable=True,
+    )
+
+    reporting_quarter = Column(
+        String(10),
+        nullable=True,
+    )
+
+    reporting_period = Column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+
+    value = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    submitted_by = Column(
+        String(255),
+        nullable=True,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
+    )
+
+    supporting_document_id = Column(
+        Integer,
+        ForeignKey(
+            "supporting_documents.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+
+    submitted_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
     )

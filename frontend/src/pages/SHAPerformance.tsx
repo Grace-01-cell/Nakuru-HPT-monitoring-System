@@ -79,64 +79,6 @@ const rejectionPie = [
   { name: "Reimbursed", value: 92 },
   { name: "Rejected", value: 8 },
 ];
-const dummyReports: SHAReport[] = [
-  {
-    report_id: "demo-1",
-    report_type: "SHA Claims",
-    frequency: "Monthly",
-    reporting_year: "2026",
-    reporting_month: "May",
-    reporting_quarter: "",
-    reporting_period: "May-2026",
-    value: 18450000,
-    submitted_by: "SHA Coordinator",
-    notes: "Demo monthly claims report",
-    supporting_document: "",
-    submitted_at: "2026-06-05",
-  },
-  {
-    report_id: "demo-2",
-    report_type: "SHA Reimbursements",
-    frequency: "Monthly",
-    reporting_year: "2026",
-    reporting_month: "May",
-    reporting_quarter: "",
-    reporting_period: "May-2026",
-    value: 16900000,
-    submitted_by: "SHA Coordinator",
-    notes: "Demo monthly reimbursement report",
-    supporting_document: "",
-    submitted_at: "2026-06-05",
-  },
-  {
-    report_id: "demo-3",
-    report_type: "SHA Rejections",
-    frequency: "Monthly",
-    reporting_year: "2026",
-    reporting_month: "May",
-    reporting_quarter: "",
-    reporting_period: "May-2026",
-    value: 1550000,
-    submitted_by: "SHA Coordinator",
-    notes: "Demo monthly rejected claims report",
-    supporting_document: "",
-    submitted_at: "2026-06-05",
-  },
-  {
-    report_id: "demo-4",
-    report_type: "SHA Contracted Facilities",
-    frequency: "Quarterly",
-    reporting_year: "2026",
-    reporting_month: "",
-    reporting_quarter: "Q2",
-    reporting_period: "Q2-2026",
-    value: 186,
-    submitted_by: "SHA Coordinator",
-    notes: "Demo quarterly contracted facilities update",
-    supporting_document: "",
-    submitted_at: "2026-06-03",
-  },
-];
 
 function money(value: number) {
   return `KES ${Number(value || 0).toLocaleString()}`;
@@ -148,10 +90,14 @@ function compactMoney(value: number) {
 
 function SHAPerformance() {
   const currentYear = new Date().getFullYear();
-
   const [reports, setReports] = useState<SHAReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedDocument, setSelectedDocument] =
+  useState<string | null>(null);
+
+const [selectedDocumentTitle, setSelectedDocumentTitle] =
+  useState("");
 
   const [selectedReportType, setSelectedReportType] = useState<string[]>(["All"]);
   const [selectedYear, setSelectedYear] = useState<string[]>(["All"]);
@@ -170,15 +116,15 @@ function SHAPerformance() {
   api
     .get("/county-sha-reports")
     .then((res) => {
-      if (res.data && res.data.length > 0) {
-        setReports(res.data);
-      } else {
-        setReports(dummyReports);
-      }
+      setReports(
+        Array.isArray(res.data)
+          ? res.data
+          : []
+      );
     })
     .catch((err) => {
       console.error(err);
-      setReports(dummyReports);
+      setReports([]);
     })
     .finally(() => setLoading(false));
 }, []);
@@ -246,12 +192,40 @@ function SHAPerformance() {
     selectedSubmittedBy,
   ]);
 
-  function openDocument(path: string) {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-    const documentPath = path.startsWith("/") ? path : `/${path}`;
-    window.open(`${baseUrl}${documentPath}`, "_blank");
+  function getDocumentUrl(path: string) {
+  if (!path) return "";
+
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://")
+  ) {
+    return path;
   }
 
+  const baseUrl = (
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8000"
+  ).replace(/\/$/, "");
+
+  const documentPath = path.startsWith("/")
+    ? path
+    : `/${path}`;
+
+  return `${baseUrl}${documentPath}`;
+}
+
+function openDocument(
+  path: string,
+  reportTitle: string
+) {
+  setSelectedDocument(path);
+  setSelectedDocumentTitle(reportTitle);
+}
+
+function closeDocument() {
+  setSelectedDocument(null);
+  setSelectedDocumentTitle("");
+}
   function downloadCSV() {
     const headers = [
       "Report Type",
@@ -525,13 +499,18 @@ function SHAPerformance() {
                   <td>
                     {report.supporting_document ? (
                       <button
-                        type="button"
-                        className="sha-view-btn"
-                        onClick={() => openDocument(report.supporting_document)}
-                      >
-                        <FileText size={15} />
-                        View
-                      </button>
+  type="button"
+  className="sha-view-btn"
+  onClick={() =>
+    openDocument(
+      report.supporting_document,
+      `${report.report_type} — ${report.reporting_period}`
+    )
+  }
+>
+  <FileText size={15} />
+  View
+</button>
                     ) : (
                       "—"
                     )}
@@ -548,12 +527,56 @@ function SHAPerformance() {
           </table>
         </div>
 
-        <p className="sha-table-footer">
+                <p className="sha-table-footer">
           Showing {filteredReports.length} uploaded SHA report(s).
         </p>
       </div>
+
+      {selectedDocument && (
+        <div
+          className="sha-document-modal-overlay"
+          onClick={closeDocument}
+        >
+          <div
+            className="sha-document-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sha-document-modal-header">
+              <div>
+                <h3>Supporting Document</h3>
+                <p>{selectedDocumentTitle}</p>
+              </div>
+
+              <button
+                type="button"
+                className="sha-document-close-btn"
+                onClick={closeDocument}
+                aria-label="Close document preview"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="sha-document-modal-body">
+              <iframe
+                src={getDocumentUrl(selectedDocument)}
+                title={selectedDocumentTitle || "SHA supporting document"}
+              />
+            </div>
+
+            <div className="sha-document-modal-footer">
+              <button
+                type="button"
+                className="sha-document-close-footer-btn"
+                onClick={closeDocument}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 export default SHAPerformance;

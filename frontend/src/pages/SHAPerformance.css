@@ -255,3 +255,117 @@
     min-width: 100%;
   }
 }
+.sha-document-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.sha-document-modal {
+  width: min(1100px, 96vw);
+  height: min(850px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
+}
+
+.sha-document-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sha-document-modal-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.sha-document-modal-header p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sha-document-close-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.sha-document-close-btn:hover {
+  background: #e2e8f0;
+}
+
+.sha-document-modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  background: #e2e8f0;
+}
+
+.sha-document-modal-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.sha-document-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 22px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sha-document-close-footer-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  background: #334155;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sha-document-close-footer-btn:hover {
+  background: #1e293b;
+}
+
+@media (max-width: 768px) {
+  .sha-document-modal-overlay {
+    padding: 10px;
+  }
+
+  .sha-document-modal {
+    width: 100%;
+    height: 94vh;
+  }
+
+  .sha-document-modal-header {
+    padding: 14px;
+  }
+
+  .sha-document-modal-footer {
+    padding: 12px 14px;
+  }
+}

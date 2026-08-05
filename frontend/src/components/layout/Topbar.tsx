@@ -5,7 +5,7 @@ function Topbar() {
   return (
     <header className="topbar">
       <div>
-        <h1>HPT - Financial InformationMonitoring System</h1>
+        <h1>HPT - Financial Information Monitoring System</h1>
         <p>Nakuru County visibility and compliance tracking</p>
       </div>
 
