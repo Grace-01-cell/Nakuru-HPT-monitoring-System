@@ -63,7 +63,7 @@ function money(value: number) {
 function readLoggedInUser(): LoggedInUser {
   try {
     return JSON.parse(
-      localStorage.getItem("hpt_user") || "{}"
+      sessionStorage.getItem("hpt_user") || "{}"
     );
   } catch (error) {
     console.error("Failed to read logged-in user:", error);

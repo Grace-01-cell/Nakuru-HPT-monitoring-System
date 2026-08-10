@@ -56,7 +56,7 @@ const hptCategories = [
 ];
 
 function DataCollection() {
-  const user = JSON.parse(localStorage.getItem("hpt_user") || "{}");
+  const user = JSON.parse(sessionStorage.getItem("hpt_user") || "{}");
   const isFacilityUser = user?.role === "facility";
 
   const [step, setStep] = useState(1);

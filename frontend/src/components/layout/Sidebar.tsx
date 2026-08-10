@@ -15,7 +15,7 @@ import "./Layout.css";
 function Sidebar() {
   const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem("hpt_user") || "{}");
+  const user = JSON.parse(sessionStorage.getItem("hpt_user") || "{}");
   const role = user?.role || "facility";
 
   const menuItems: {
@@ -61,7 +61,7 @@ if (role === "admin") {
 }
 
   function handleLogout() {
-    localStorage.removeItem("hpt_user");
+    sessionStorage.removeItem("hpt_user");
     navigate("/");
   }
 

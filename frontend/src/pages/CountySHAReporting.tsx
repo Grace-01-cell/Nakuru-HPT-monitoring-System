@@ -47,7 +47,7 @@ function formatAmountInput(value: string) {
 
 function CountySHAReporting() {
   const user = JSON.parse(
-    localStorage.getItem("hpt_user") || "{}"
+    sessionStorage.getItem("hpt_user") || "{}"
   );
 
   const currentYear = new Date().getFullYear();

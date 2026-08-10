@@ -26,7 +26,7 @@ function Login() {
 
       const user = res.data.user;
 
-      localStorage.setItem("hpt_user", JSON.stringify(user));
+      sessionStorage.setItem("hpt_user", JSON.stringify(user));
 
       if (user.role === "facility") {
         navigate("/data-collection");
