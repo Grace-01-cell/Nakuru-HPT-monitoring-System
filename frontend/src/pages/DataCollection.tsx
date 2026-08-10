@@ -256,7 +256,21 @@ function DataCollection() {
           ? "No Funds Received"
           : funding
               .filter((item) => item.selected)
-              .map((item) => `${item.source}: ${cleanNumber(item.amount)}`)
+              .map((item) => {
+                if (item.source === "Partners") {
+                  return item.detail.trim()
+                    ? `Partner Funding (${item.detail.trim()})`
+                    : "Partner Funding";
+                }
+
+                if (item.source === "Monetary Donations") {
+                  return item.detail.trim()
+                    ? `Donor Funding (${item.detail.trim()})`
+                    : "Donor Funding";
+                }
+
+                return item.source;
+              })
               .join("; ")
       );
       const monthMap: Record<string, string> = {
